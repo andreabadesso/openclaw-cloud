@@ -1,4 +1,3 @@
-import json
 import secrets
 
 import redis.asyncio as aioredis
@@ -9,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from openclaw_api.config import settings
 from openclaw_api.deps import get_current_customer_id, get_db, get_redis
+from openclaw_api.jobs import enqueue_job
 from openclaw_api.models import (
     Box,
     BoxStatus,
@@ -135,14 +135,9 @@ async def confirm_connection(
         db.add(job)
         await db.commit()
         await db.refresh(job)
-        await r.rpush(
-            "operator:jobs",
-            json.dumps({
-                "job_id": job.id,
-                "type": "update_connections",
-                "customer_id": customer_id,
-                "box_id": box.id,
-            }),
+        await enqueue_job(
+            r, job_id=job.id, job_type="update_connections",
+            customer_id=customer_id, box_id=box.id,
         )
     else:
         await db.commit()
@@ -194,14 +189,9 @@ async def delete_connection(
         db.add(job)
         await db.commit()
         await db.refresh(job)
-        await r.rpush(
-            "operator:jobs",
-            json.dumps({
-                "job_id": job.id,
-                "type": "update_connections",
-                "customer_id": customer_id,
-                "box_id": box.id,
-            }),
+        await enqueue_job(
+            r, job_id=job.id, job_type="update_connections",
+            customer_id=customer_id, box_id=box.id,
         )
     else:
         await db.commit()

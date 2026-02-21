@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as aioredis
@@ -7,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openclaw_api.deps import get_db, get_redis
+from openclaw_api.jobs import enqueue_job
 from openclaw_api.models import (
     Box,
     BoxStatus,
@@ -121,15 +121,9 @@ async def provision_box(
     await db.refresh(job)
 
     # Enqueue to Redis for operator
-    await r.rpush(
-        "operator:jobs",
-        json.dumps({
-            "job_id": job.id,
-            "type": "provision",
-            "customer_id": customer.id,
-            "box_id": box.id,
-            "payload": job.payload,
-        }),
+    await enqueue_job(
+        r, job_id=job.id, job_type="provision",
+        customer_id=customer.id, box_id=box.id, payload=job.payload,
     )
 
     return ProvisionResponse(customer_id=customer.id, box_id=box.id, job_id=job.id)
@@ -159,9 +153,9 @@ async def destroy_box(
     await db.commit()
     await db.refresh(job)
 
-    await r.rpush(
-        "operator:jobs",
-        json.dumps({"job_id": job.id, "type": "destroy", "customer_id": box.customer_id, "box_id": box.id}),
+    await enqueue_job(
+        r, job_id=job.id, job_type="destroy",
+        customer_id=box.customer_id, box_id=box.id,
     )
 
     return JobEnqueuedResponse(job_id=job.id, box_id=box.id)
@@ -190,9 +184,9 @@ async def suspend_box(
     await db.commit()
     await db.refresh(job)
 
-    await r.rpush(
-        "operator:jobs",
-        json.dumps({"job_id": job.id, "type": "suspend", "customer_id": box.customer_id, "box_id": box.id}),
+    await enqueue_job(
+        r, job_id=job.id, job_type="suspend",
+        customer_id=box.customer_id, box_id=box.id,
     )
 
     return JobEnqueuedResponse(job_id=job.id, box_id=box.id)
@@ -221,9 +215,9 @@ async def reactivate_box(
     await db.commit()
     await db.refresh(job)
 
-    await r.rpush(
-        "operator:jobs",
-        json.dumps({"job_id": job.id, "type": "reactivate", "customer_id": box.customer_id, "box_id": box.id}),
+    await enqueue_job(
+        r, job_id=job.id, job_type="reactivate",
+        customer_id=box.customer_id, box_id=box.id,
     )
 
     return JobEnqueuedResponse(job_id=job.id, box_id=box.id)

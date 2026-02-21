@@ -1,11 +1,10 @@
-import json
-
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openclaw_api.deps import get_current_customer_id, get_db, get_redis
+from openclaw_api.jobs import enqueue_job
 from openclaw_api.models import Box, BoxStatus, OperatorJob, JobType, JobStatus
 from openclaw_api.schemas import BoxResponse, UpdateBoxRequest, JobEnqueuedResponse
 
@@ -66,9 +65,9 @@ async def update_my_box(
     await db.commit()
     await db.refresh(job)
 
-    await r.rpush(
-        "operator:jobs",
-        json.dumps({"job_id": job.id, "type": "update", "customer_id": customer_id, "box_id": box.id, "payload": updates}),
+    await enqueue_job(
+        r, job_id=job.id, job_type="update",
+        customer_id=customer_id, box_id=box.id, payload=updates,
     )
 
     return JobEnqueuedResponse(job_id=job.id, box_id=box.id)
