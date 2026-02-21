@@ -31,7 +31,7 @@ User visits site  ──>  Picks a plan  ──>  Enters Telegram details
                                           Telegram bot goes live
 ```
 
-Each customer gets a **dedicated Kubernetes namespace** with full isolation: resource quotas, network policies, and a unique proxy token for AI API access. Customer pods never hold real API keys.
+Each customer gets a **dedicated Kubernetes namespace** with full isolation: resource quotas, network policies, and a unique proxy token for AI API access. All services — control plane and customer pods — run inside the same K8s cluster, both locally (k3d) and in production (K3s).
 
 ---
 
@@ -39,40 +39,36 @@ Each customer gets a **dedicated Kubernetes namespace** with full isolation: res
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Control Plane                            │
-│                                                                 │
-│  ┌────────┐ ┌────────┐ ┌──────────┐ ┌───────────┐ ┌───────────┐│
-│  │  Web   │ │  API   │ │ Operator │ │Token Proxy│ │   Nango   ││
-│  │Next.js │─│FastAPI │─│ (Python) │ │ (FastAPI) │ │  (OAuth)  ││
-│  │ :3000  │ │ :8000  │ │          │ │   :8080   │ │   :3003   ││
-│  └────────┘ └───┬────┘ └────┬─────┘ └─────┬─────┘ └─────┬─────┘│
-│                 │           │              │              │      │
-│          ┌──────┴──────┐ ┌──┴───┐         │              │      │
-│          │  PostgreSQL │ │Redis │         │              │      │
-│          │    :5432    │ │:6379 │         │              │      │
-│          └─────────────┘ └──────┘         │              │      │
-└───────────────────────────────────────────┼──────────────┼──────┘
-                                                      │
-┌─────────────────────────────────────────────────────┼──────────┐
-│                    K8s Cluster (K3s)                 │          │
-│                                                     │          │
-│  ┌─ customer-abc123 ──────────────────────────┐     │          │
-│  │  Namespace + ResourceQuota + NetworkPolicy  │     │          │
-│  │  ┌──────────────────────┐                   │     │          │
-│  │  │  openclaw-gateway    │  ── Kimi API ──>──┼─────┘          │
-│  │  │  (Telegram bot +     │     via proxy                      │
-│  │  │   AI agent)          │     token                          │
-│  │  └──────────────────────┘                   │                │
-│  └─────────────────────────────────────────────┘                │
-│                                                                 │
-│  ┌─ customer-def456 ──────────┐                                 │
-│  │  (another isolated pod)    │                                 │
-│  └────────────────────────────┘                                 │
-│                                                                 │
-│  ┌─ customer-ghi789 ──────────┐                                 │
-│  │  (another isolated pod)    │                                 │
-│  └────────────────────────────┘                                 │
-└─────────────────────────────────────────────────────────────────┘
+│                    K8s Cluster (K3s / k3d)                       │
+│                                                                  │
+│  ┌─ platform namespace ───────────────────────────────────────┐  │
+│  │                                                             │  │
+│  │  ┌────────┐ ┌────────┐ ┌──────────┐ ┌───────────┐          │  │
+│  │  │  Web   │ │  API   │ │ Operator │ │Token Proxy│          │  │
+│  │  │Next.js │─│FastAPI │─│ (Python) │ │ (FastAPI) │          │  │
+│  │  │ :3000  │ │ :8000  │ │          │ │   :8080   │          │  │
+│  │  └────────┘ └───┬────┘ └────┬─────┘ └─────┬─────┘          │  │
+│  │                 │           │              │                │  │
+│  │  ┌──────────┐ ┌┴─────┐ ┌───┴─────┐                         │  │
+│  │  │PostgreSQL│ │Redis │ │  Nango  │                         │  │
+│  │  │  :5432   │ │:6379 │ │ (OAuth) │                         │  │
+│  │  └──────────┘ └──────┘ │  :8080  │                         │  │
+│  │                         └─────────┘                         │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─ customer-abc123 ──────────────────────────┐                  │
+│  │  Namespace + ResourceQuota + NetworkPolicy  │                  │
+│  │  ┌──────────────────────┐                   │                  │
+│  │  │  openclaw-gateway    │  ── Kimi API ──>  │                  │
+│  │  │  (Telegram bot +     │     via proxy     │                  │
+│  │  │   AI agent)          │     token         │                  │
+│  │  └──────────────────────┘                   │                  │
+│  └─────────────────────────────────────────────┘                  │
+│                                                                  │
+│  ┌─ customer-def456 ──────────┐                                  │
+│  │  (another isolated pod)    │                                  │
+│  └────────────────────────────┘                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Services
@@ -129,10 +125,12 @@ Each customer gets a **dedicated Kubernetes namespace** with full isolation: res
 
 ## Local Development
 
+All services run inside a local k3d cluster, matching the production K3s architecture. Docker Compose is only used for building images.
+
 ### Prerequisites
 
 - [Nix](https://nixos.org/) with flakes enabled
-- [Docker](https://www.docker.com/) + Docker Compose (for building images)
+- [Docker](https://www.docker.com/) (for building images)
 - [k3d](https://k3d.io/) (or use `nix run nixpkgs#k3d`)
 
 ### Quick Start
@@ -172,8 +170,7 @@ open http://localhost:3000/admin
 | API | http://localhost:8000 | REST API |
 | Token Proxy | http://localhost:8080 | AI API proxy |
 | Nango | http://localhost:3003 | OAuth admin dashboard |
-| PostgreSQL | localhost:5432 | Database |
-| Redis | localhost:6379 | Queue & cache |
+| PostgreSQL | localhost:5432 | Database (via NodePort) |
 
 ### Provisioning a Test Instance
 
@@ -225,7 +222,8 @@ curl -X POST http://localhost:8000/internal/destroy/<box_id>
 openclaw-cloud/
 ├── flake.nix                     # Nix flake: Colmena + kubenix + nix2container
 ├── cluster.example.json          # Template for cluster node IPs
-├── docker-compose.yml            # Local dev orchestration
+├── docker-compose.yml            # Build-only (image definitions for docker build)
+├── k3d.yaml                      # k3d cluster config (ports, agents)
 │
 ├── apps/
 │   ├── api/                      # FastAPI — provisioning, box management, usage
@@ -235,7 +233,7 @@ openclaw-cloud/
 │   │       │   ├── internal.py   # /internal/provision, /suspend, /destroy, /boxes
 │   │       │   ├── boxes.py      # /me/box — customer-facing
 │   │       │   ├── usage.py      # /me/usage
-│   │       │   └── connections.py# OAuth connections, agent API endpoints
+│   │       │   └── connections/  # OAuth connections, agent API endpoints
 │   │       ├── nango_client.py   # Async httpx Nango API wrapper
 │   │       ├── models.py         # SQLAlchemy ORM models
 │   │       └── schemas.py        # Pydantic request/response schemas
@@ -282,10 +280,15 @@ openclaw-cloud/
 │   ├── control-plane.nix         # K3s server
 │   └── worker.nix                # K3s agent
 │
+├── scripts/
+│   ├── dev-setup.sh              # Full local bootstrap (k3d + build + deploy)
+│   └── dev-import.sh             # Rebuild & redeploy a single service
+│
 ├── k8s/                          # kubenix manifests for platform services
 │   ├── namespaces.nix
-│   ├── infrastructure/           # Redis, ingress
-│   └── services/                 # API, web, operator, token-proxy, etc.
+│   ├── infrastructure/           # Postgres, Redis, ingress
+│   ├── services/                 # API, web, operator, token-proxy, nango
+│   └── local/                    # Dev-only secrets + NodePort services
 │
 ├── db/
 │   └── migrations/
