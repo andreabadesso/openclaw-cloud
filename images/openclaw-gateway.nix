@@ -43,7 +43,9 @@ let
       cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
 # External Service Connections
 
-You have access to external services via an authenticated proxy. Use \`web_fetch\` to make API calls.
+You have access to external services via an authenticated proxy. Use the \`exec\` tool to run \`curl\` commands.
+
+**IMPORTANT**: The \`web_fetch\` tool does NOT support custom headers. You MUST use \`exec\` with \`curl\` for all proxy requests.
 
 ## Connected Services
 
@@ -51,31 +53,44 @@ $CONN_LIST
 
 ## How to Make API Calls
 
-Use the \`web_fetch\` tool to call external APIs through the Nango proxy at:
-\`$NANGO_PROXY_URL/proxy\`
+Use the \`exec\` tool to run curl commands against the Nango proxy at \`$NANGO_PROXY_URL/proxy\`.
 
 Required headers for every proxy request:
-- \`Authorization: Bearer $NANGO_SECRET_KEY\`
-- \`Connection-Id: <connection_id from above>\`
-- \`Provider-Config-Key: <provider name>\`
+\`\`\`
+Authorization: Bearer $NANGO_SECRET_KEY
+Connection-Id: <connection_id from the list above>
+Provider-Config-Key: <provider name>
+\`\`\`
 
 ### Google Drive Example
 
-To list Google Drive files, use web_fetch with:
-- URL: \`$NANGO_PROXY_URL/proxy/drive/v3/files?pageSize=10\`
-- Headers: \`Authorization: Bearer $NANGO_SECRET_KEY\`, \`Connection-Id: <google_connection_id>\`, \`Provider-Config-Key: google\`
+List files:
+\`\`\`
+curl -s "$NANGO_PROXY_URL/proxy/drive/v3/files?pageSize=10" \\
+  -H "Authorization: Bearer $NANGO_SECRET_KEY" \\
+  -H "Connection-Id: <google_connection_id>" \\
+  -H "Provider-Config-Key: google"
+\`\`\`
 
 ### Google Sheets Example
 
-- URL: \`$NANGO_PROXY_URL/proxy/v4/spreadsheets/<spreadsheet_id>\`
-- Same headers as above.
+\`\`\`
+curl -s "$NANGO_PROXY_URL/proxy/v4/spreadsheets/<spreadsheet_id>" \\
+  -H "Authorization: Bearer $NANGO_SECRET_KEY" \\
+  -H "Connection-Id: <google_connection_id>" \\
+  -H "Provider-Config-Key: google"
+\`\`\`
 
 ### Requesting New Connections
 
-If the user asks for a service that is not connected, use web_fetch to POST to:
-\`$AGENT_API_URL/internal/agent/connect-link\`
-with headers \`Authorization: Bearer $AGENT_API_SECRET\` and \`Content-Type: application/json\`
-and body \`{"customer_id":"$AGENT_CUSTOMER_ID","provider":"<provider_name>"}\`
+If the user asks for a service that is not connected:
+
+\`\`\`
+curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" \\
+  -H "Authorization: Bearer $AGENT_API_SECRET" \\
+  -H "Content-Type: application/json" \\
+  -d '{"customer_id":"$AGENT_CUSTOMER_ID","provider":"<provider_name>"}'
+\`\`\`
 
 This returns a URL. Send it to the user so they can complete OAuth in their browser.
 
@@ -134,7 +149,7 @@ in n2c.buildImage {
 
   copyToRoot = pkgs.buildEnv {
     name  = "root";
-    paths = [ caCerts pkgs.tzdata pkgs.coreutils pkgs.gnused pkgs.jq pkgs.curl ];
+    paths = [ caCerts pkgs.tzdata pkgs.coreutils pkgs.gnused pkgs.jq pkgs.curl pkgs.bash ];
     pathsToLink = [ "/etc" "/share/zoneinfo" "/bin" ];
   };
 
