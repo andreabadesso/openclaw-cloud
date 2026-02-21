@@ -1,0 +1,17 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: openclaw-dev
+servers: 1
+agents: 1
+options:
+  k3s:
+    extraArgs:
+      - arg: "--disable=traefik"
+        nodeFilters: ["server:*"]
+ports:
+  - port: 3000:30000@server:0   # web
+  - port: 3003:30003@server:0   # nango (OAuth callbacks)
+  - port: 8000:30080@server:0   # api
+  - port: 8080:30800@server:0   # token-proxy
+  - port: 5432:30432@server:0   # postgres (local psql)
