@@ -25,12 +25,15 @@ in {
                 { name = "NANGO_REDIS_URL";     value = "redis://redis.platform.svc.cluster.local:6379/1"; }
                 { name = "FLAG_AUTH_ENABLED";   value = "false"; }
               ];
-              ports = [{ containerPort = 8080; }];
+              ports = [{ containerPort = 8080; protocol = "TCP"; }];
               resources = {
                 requests = { cpu = "200m"; memory = "256Mi"; };
                 limits   = { cpu = "500m"; memory = "512Mi"; };
               };
-              readinessProbe.httpGet = { path = "/health"; port = 8080; initialDelaySeconds = 10; };
+              readinessProbe = {
+                httpGet = { path = "/health"; port = 8080; };
+                initialDelaySeconds = 10;
+              };
             };
           };
         };
@@ -41,7 +44,7 @@ in {
       metadata = { name = "nango-server"; namespace = "platform"; };
       spec = {
         selector.app = "nango-server";
-        ports = [{ port = 8080; targetPort = 8080; }];
+        ports = [{ port = 8080; targetPort = 8080; protocol = "TCP"; }];
       };
     };
   };

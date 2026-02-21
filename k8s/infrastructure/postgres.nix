@@ -26,7 +26,7 @@
                 { name = "POSTGRES_DB";       valueFrom.secretKeyRef = { name = "platform-secrets"; key = "postgres_db"; }; }
                 { name = "PGDATA";            value = "/var/lib/postgresql/data/pgdata"; }
               ];
-              ports = [{ containerPort = 5432; }];
+              ports = [{ containerPort = 5432; protocol = "TCP"; }];
               resources = {
                 requests = { cpu = "200m"; memory = "256Mi"; };
                 limits   = { cpu = "1000m"; memory = "1Gi"; };
@@ -61,7 +61,7 @@
       metadata = { name = "postgres"; namespace = "platform"; };
       spec = {
         selector.app = "postgres";
-        ports = [{ port = 5432; targetPort = 5432; }];
+        ports = [{ port = 5432; targetPort = 5432; protocol = "TCP"; }];
         clusterIP = "None";  # headless for StatefulSet
       };
     };

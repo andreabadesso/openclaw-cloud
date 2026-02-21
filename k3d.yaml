@@ -10,8 +10,13 @@ options:
       - arg: "--disable=traefik"
         nodeFilters: ["server:*"]
 ports:
-  - port: 3000:30000@server:0   # web
-  - port: 3003:30003@server:0   # nango (OAuth callbacks)
-  - port: 8000:30080@server:0   # api
-  - port: 8080:30800@server:0   # token-proxy
-  - port: 5432:30432@server:0   # postgres (local psql)
+  - port: 3000:30000
+    nodeFilters: ["server:0"]
+  - port: 3003:30003
+    nodeFilters: ["server:0"]
+  - port: 8000:30080
+    nodeFilters: ["server:0"]
+  - port: 8080:30800
+    nodeFilters: ["server:0"]
+  - port: 5432:30432
+    nodeFilters: ["server:0"]

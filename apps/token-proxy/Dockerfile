@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir .
 
 COPY apps/token-proxy/token_proxy/ token_proxy/
 
-EXPOSE 8000
+ENV PORT=8080
+EXPOSE 8080
 
-CMD ["uvicorn", "token_proxy.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh", "-c", "uvicorn token_proxy.main:app --host 0.0.0.0 --port ${PORT}"]

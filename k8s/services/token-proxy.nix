@@ -25,13 +25,16 @@ in {
             containers.token-proxy = {
               inherit image;
               env = commonEnv;
-              ports = [{ containerPort = 8080; }];
+              ports = [{ containerPort = 8080; protocol = "TCP"; }];
               resources = {
                 requests = { cpu = "100m"; memory = "128Mi"; };
                 limits   = { cpu = "500m"; memory = "256Mi"; };
               };
               livenessProbe.httpGet  = { path = "/health"; port = 8080; };
-              readinessProbe.httpGet = { path = "/health"; port = 8080; initialDelaySeconds = 3; };
+              readinessProbe = {
+                httpGet = { path = "/health"; port = 8080; };
+                initialDelaySeconds = 3;
+              };
             };
           };
         };
@@ -42,7 +45,7 @@ in {
       metadata = { name = "token-proxy"; namespace = "platform"; };
       spec = {
         selector.app = "token-proxy";
-        ports = [{ port = 8080; targetPort = 8080; }];
+        ports = [{ port = 8080; targetPort = 8080; protocol = "TCP"; }];
       };
     };
 

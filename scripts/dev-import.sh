@@ -10,10 +10,10 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$ROOT_DIR"
 
+IMAGE="ghcr.io/andreabadesso/openclaw-cloud/${SERVICE}:latest"
+
 echo "==> Building ${SERVICE}..."
 docker compose build "$SERVICE"
-
-IMAGE="openclaw-cloud-${SERVICE}:latest"
 
 echo "==> Importing ${IMAGE} into k3d..."
 k3d image import -c openclaw-dev "$IMAGE"

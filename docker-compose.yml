@@ -4,22 +4,22 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    image: openclaw-cloud-api:latest
+    image: ghcr.io/andreabadesso/openclaw-cloud/api:latest
 
   token-proxy:
     build:
       context: .
       dockerfile: apps/token-proxy/Dockerfile
-    image: openclaw-cloud-token-proxy:latest
+    image: ghcr.io/andreabadesso/openclaw-cloud/token-proxy:latest
 
   operator:
     build:
       context: .
       dockerfile: apps/operator/Dockerfile
-    image: openclaw-cloud-operator:latest
+    image: ghcr.io/andreabadesso/openclaw-cloud/operator:latest
 
   web:
     build:
       context: apps/web
       dockerfile: Dockerfile
-    image: openclaw-cloud-web:latest
+    image: ghcr.io/andreabadesso/openclaw-cloud/web:latest

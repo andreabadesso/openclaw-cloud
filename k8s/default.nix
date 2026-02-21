@@ -3,7 +3,7 @@
 
 {
   imports = [
-    inputs.kubenix.modules.k8s
+    inputs.kubenix.nixosModules.kubenix.k8s
 
     ./namespaces.nix
     ./infrastructure/redis.nix

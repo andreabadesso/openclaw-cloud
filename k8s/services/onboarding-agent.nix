@@ -22,7 +22,7 @@ in {
                 { name = "API_INTERNAL_URL"; value = "http://api.platform.svc.cluster.local:8000"; }
                 { name = "PORT"; value = "9000"; }
               ];
-              ports = [{ containerPort = 9000; }];
+              ports = [{ containerPort = 9000; protocol = "TCP"; }];
               resources = {
                 requests = { cpu = "500m"; memory = "512Mi"; };
                 limits   = { cpu = "2000m"; memory = "2Gi"; };
@@ -37,7 +37,7 @@ in {
       metadata = { name = "onboarding-agent"; namespace = "platform"; };
       spec = {
         selector.app = "onboarding-agent";
-        ports = [{ port = 9000; targetPort = 9000; }];
+        ports = [{ port = 9000; targetPort = 9000; protocol = "TCP"; }];
       };
     };
   };

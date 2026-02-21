@@ -23,12 +23,15 @@ in {
                 { name = "REDIS_OPERATOR_QUEUE"; value = "operator:jobs"; }
                 { name = "PORT";             value = "8000"; }
               ];
-              ports = [{ containerPort = 8000; }];
+              ports = [{ containerPort = 8000; protocol = "TCP"; }];
               resources = {
                 requests = { cpu = "200m"; memory = "256Mi"; };
                 limits   = { cpu = "1000m"; memory = "1Gi"; };
               };
-              readinessProbe.httpGet = { path = "/health"; port = 8000; initialDelaySeconds = 5; };
+              readinessProbe = {
+                httpGet = { path = "/health"; port = 8000; };
+                initialDelaySeconds = 5;
+              };
             };
           };
         };
@@ -39,7 +42,7 @@ in {
       metadata = { name = "api"; namespace = "platform"; };
       spec = {
         selector.app = "api";
-        ports = [{ port = 8000; targetPort = 8000; }];
+        ports = [{ port = 8000; targetPort = 8000; protocol = "TCP"; }];
       };
     };
   };

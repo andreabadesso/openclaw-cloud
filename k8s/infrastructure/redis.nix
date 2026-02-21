@@ -21,7 +21,7 @@
               env.REDIS_PASSWORD = {
                 valueFrom.secretKeyRef = { name = "redis-secret"; key = "password"; };
               };
-              ports = [{ containerPort = 6379; }];
+              ports = [{ containerPort = 6379; protocol = "TCP"; }];
               resources = {
                 requests = { cpu = "100m"; memory = "128Mi"; };
                 limits   = { cpu = "500m"; memory = "768Mi"; };
@@ -44,7 +44,7 @@
       metadata = { name = "redis"; namespace = "platform"; };
       spec = {
         selector.app = "redis";
-        ports = [{ port = 6379; targetPort = 6379; }];
+        ports = [{ port = 6379; targetPort = 6379; protocol = "TCP"; }];
         clusterIP = "None";  # headless for StatefulSet
       };
     };
