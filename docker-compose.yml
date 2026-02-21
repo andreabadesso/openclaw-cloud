@@ -1,135 +1,25 @@
+# Build-only — runtime is in k3d. Use scripts/dev-setup.sh to deploy.
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: openclaw
-      POSTGRES_DB: openclaw_cloud
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/000_init-multiple-dbs.sh:ro
-      - ./db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
-      - ./db/migrations/002_connections.sql:/docker-entrypoint-initdb.d/002_connections.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw_cloud"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://openclaw:openclaw@postgres:5432/openclaw_cloud
-      REDIS_URL: redis://redis:6379/0
-      CORS_ORIGINS: "http://localhost:3000"
-      NANGO_SERVER_URL: http://nango-server:8080
-      NANGO_PUBLIC_URL: http://localhost:3003
-      NANGO_SECRET_KEY: ${NANGO_SECRET_KEY:-7c999a69-a4f8-440a-b677-be2bee532fe3}
-      AGENT_API_SECRET: ${AGENT_API_SECRET:-dev-agent-secret}
-      DEBUG: "true"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    image: openclaw-cloud-api:latest
 
   token-proxy:
     build:
       context: .
       dockerfile: apps/token-proxy/Dockerfile
-    ports:
-      - "8080:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://openclaw:openclaw@postgres:5432/openclaw_cloud
-      REDIS_URL: redis://redis:6379/0
-      KIMI_API_KEY: ${KIMI_API_KEY:-sk-test-placeholder}
-      KIMI_BASE_URL: ${KIMI_BASE_URL:-https://api.moonshot.cn/v1}
-      INTERNAL_API_KEY: dev-internal-key
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    image: openclaw-cloud-token-proxy:latest
 
   operator:
     build:
       context: .
       dockerfile: apps/operator/Dockerfile
-    environment:
-      DATABASE_URL: postgresql+asyncpg://openclaw:openclaw@postgres:5432/openclaw_cloud
-      REDIS_URL: redis://redis:6379/0
-      TOKEN_PROXY_URL: http://token-proxy:8000
-      OPENCLAW_IMAGE: ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest
-      INTERNAL_API_KEY: dev-internal-key
-      NANGO_SERVER_URL: http://nango-server:8080
-      NANGO_SECRET_KEY: ${NANGO_SECRET_KEY:-7c999a69-a4f8-440a-b677-be2bee532fe3}
-      AGENT_API_SECRET: ${AGENT_API_SECRET:-dev-agent-secret}
-      API_URL: http://api:8000
-      WEB_URL: ${WEB_URL:-http://localhost:3000}
-      KUBECONFIG: /root/.kube/config
-    volumes:
-      - /tmp/operator-kubeconfig.yaml:/root/.kube/config:ro
-    networks:
-      - default
-      - k3d-openclaw-dev
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  nango-server:
-    image: nangohq/nango-server:hosted
-    ports:
-      - "3003:8080"
-    environment:
-      NANGO_DB_USER: openclaw
-      NANGO_DB_PASSWORD: openclaw
-      NANGO_DB_HOST: postgres
-      NANGO_DB_PORT: "5432"
-      NANGO_DB_NAME: nango
-      NANGO_ENCRYPTION_KEY: ${NANGO_ENCRYPTION_KEY:-oFXip3RDRZWdxG6hxh1o5irgQUTFmQeHQDxd3bg1sEg=}
-      NANGO_SERVER_URL: ${NANGO_PUBLIC_SERVER_URL:-http://localhost:3003}
-      NANGO_PUBLIC_SERVER_URL: ${NANGO_PUBLIC_SERVER_URL:-http://localhost:3003}
-      FLAG_AUTH_ENABLED: "false"
-      NANGO_REDIS_URL: redis://redis:6379/1
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    image: openclaw-cloud-operator:latest
 
   web:
     build:
       context: apps/web
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      API_URL: http://api:8000
-    depends_on:
-      - api
-
-networks:
-  default:
-  k3d-openclaw-dev:
-    external: true
-
-volumes:
-  pgdata:
+    image: openclaw-cloud-web:latest

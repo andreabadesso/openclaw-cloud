@@ -132,7 +132,7 @@ Each customer gets a **dedicated Kubernetes namespace** with full isolation: res
 ### Prerequisites
 
 - [Nix](https://nixos.org/) with flakes enabled
-- [Docker](https://www.docker.com/) + Docker Compose
+- [Docker](https://www.docker.com/) + Docker Compose (for building images)
 - [k3d](https://k3d.io/) (or use `nix run nixpkgs#k3d`)
 
 ### Quick Start
@@ -143,36 +143,25 @@ git clone git@github.com:andreabadesso/openclaw-cloud.git
 cd openclaw-cloud
 nix develop   # or: direnv allow
 
-# 2. Copy env file
-cp .env.example .env
-# Edit .env — set KIMI_API_KEY to a real key for AI to work
+# 2. Run the setup script (creates k3d cluster, builds & deploys everything)
+./scripts/dev-setup.sh
 
-# 3. Start infrastructure
-docker compose up -d
-
-# 4. Create local K8s cluster
-nix run nixpkgs#k3d -- cluster create openclaw-dev \
-  --agents 1 \
-  --k3s-arg "--disable=traefik@server:0"
-
-# 5. Build and load the OpenClaw gateway image into k3d
+# 3. Build and load the OpenClaw gateway image into k3d
 nix build .#openclaw-image.copyTo
-# The output path contains a copy-to script:
 result/bin/copy-to docker-archive:/tmp/oc.tar:ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest
 docker load -i /tmp/oc.tar
-nix run nixpkgs#k3d -- image import \
-  ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest \
-  --cluster openclaw-dev
+k3d image import ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest -c openclaw-dev
 rm /tmp/oc.tar
 
-# 6. Connect operator to k3d
-# Copy k3d kubeconfig for the operator container:
-nix run nixpkgs#k3d -- kubeconfig get openclaw-dev > /tmp/operator-kubeconfig.yaml
-# Restart operator to pick up kubeconfig
-docker compose restart operator
-
-# 7. Open the admin panel
+# 4. Open the admin panel
 open http://localhost:3000/admin
+```
+
+### Rebuilding a Single Service
+
+```bash
+# After code changes, rebuild and redeploy one service:
+./scripts/dev-import.sh api       # or: operator, token-proxy, web
 ```
 
 ### Services & Ports
@@ -384,7 +373,7 @@ result/bin/copy-to docker://ghcr.io/andreabadesso/openclaw-cloud/openclaw-gatewa
 - [x] Admin provisioning panel
 - [x] K8s pod lifecycle (provision, suspend, reactivate, destroy)
 - [x] OpenClaw gateway container image (nix2container)
-- [x] Local dev environment (Docker Compose + k3d)
+- [x] Local dev environment (k3d)
 - [x] Nango-powered OAuth connections (GitHub, Slack, Linear, Google, Notion, Jira)
 - [x] Agent connection discovery API + deep-link generation
 - [ ] JWT RS256 authentication
