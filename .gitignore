@@ -1,0 +1,6 @@
+cluster.json
+.direnv/
+result
+result-*
+*.age
+secrets/
