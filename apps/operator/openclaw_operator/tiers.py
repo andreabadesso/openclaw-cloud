@@ -12,21 +12,21 @@ class TierResources:
 TIER_RESOURCES: dict[str, TierResources] = {
     "starter": TierResources(
         cpu_request="250m",
-        cpu_limit="500m",
-        memory_request="128Mi",
-        memory_limit="256Mi",
+        cpu_limit="1000m",
+        memory_request="512Mi",
+        memory_limit="1Gi",
     ),
     "pro": TierResources(
         cpu_request="500m",
-        cpu_limit="1000m",
-        memory_request="256Mi",
-        memory_limit="512Mi",
-    ),
-    "team": TierResources(
-        cpu_request="1000m",
         cpu_limit="2000m",
         memory_request="512Mi",
         memory_limit="1Gi",
+    ),
+    "team": TierResources(
+        cpu_request="1000m",
+        cpu_limit="4000m",
+        memory_request="1Gi",
+        memory_limit="2Gi",
     ),
 }
 

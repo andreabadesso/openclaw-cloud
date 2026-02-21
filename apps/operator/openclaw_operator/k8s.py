@@ -123,6 +123,7 @@ def create_config_secret(
                 "KIMI_BASE_URL": "http://token-proxy.platform.svc.cluster.local:8080/v1",
                 "OPENCLAW_MODEL": model,
                 "OPENCLAW_THINKING": thinking,
+                "NODE_OPTIONS": "--max-old-space-size=896",
             },
         ),
     )
@@ -243,6 +244,7 @@ def _build_deployment(customer_id: str, tier: str, image: str) -> V1Deployment:
                         V1Container(
                             name="openclaw-gateway",
                             image=image,
+                            image_pull_policy="IfNotPresent",
                             env_from=[
                                 V1EnvFromSource(
                                     secret_ref=V1SecretEnvSource(name="openclaw-config"),
