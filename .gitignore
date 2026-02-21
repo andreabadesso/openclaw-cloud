@@ -4,3 +4,12 @@ result
 result-*
 *.age
 secrets/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+node_modules/
+.next/
+.venv/

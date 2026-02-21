@@ -1,15 +1,25 @@
 # K3s control plane node
-{ pkgs, config, ... }: {
-  networking.hostName = "openclaw-cp-1";
+{ pkgs, config, ... }:
 
+let
+  clusterConfig = builtins.fromJSON (builtins.readFile ../cluster.json);
+in {
   services.k3s = {
     enable      = true;
     role        = "server";
     tokenFile   = config.sops.secrets.k3s_token.path;
     extraFlags  = builtins.concatStringsSep " " [
+      "--tls-san=${clusterConfig.controlPlane.publicIp}"
+      "--tls-san=${clusterConfig.controlPlane.ip}"
+      "--node-ip=${clusterConfig.controlPlane.ip}"
+      "--advertise-address=${clusterConfig.controlPlane.ip}"
+      "--cluster-cidr=10.42.0.0/16"
+      "--service-cidr=10.43.0.0/16"
       "--disable traefik"             # we run ingress-nginx instead
       "--disable servicelb"           # we use MetalLB or Hetzner CCM
       "--flannel-backend=wireguard-native"
+      "--flannel-iface=ens10"         # Hetzner private network interface
+      "--write-kubeconfig-mode=0644"
       "--node-label=openclaw/role=control-plane"
     ];
   };

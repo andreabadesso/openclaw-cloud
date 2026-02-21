@@ -1,10 +1,16 @@
 {
   "controlPlane": {
-    "ip": "10.0.0.10"
+    "ip": "10.0.0.10",
+    "publicIp": "YOUR_CONTROL_PLANE_PUBLIC_IP"
   },
   "workers": {
-    "worker-1": { "ip": "10.0.0.11" },
-    "worker-2": { "ip": "10.0.0.12" }
+    "worker-1": { "ip": "10.0.0.11", "publicIp": "YOUR_WORKER_1_PUBLIC_IP" },
+    "worker-2": { "ip": "10.0.0.12", "publicIp": "YOUR_WORKER_2_PUBLIC_IP" }
   },
-  "k3sToken": "REPLACE_WITH_LONG_RANDOM_STRING"
+  "buildHost": {
+    "ip": "10.0.0.20",
+    "publicIp": "YOUR_BUILD_HOST_PUBLIC_IP"
+  },
+  "domain": "openclaw.cloud",
+  "privateNetworkCidr": "10.0.0.0/24"
 }

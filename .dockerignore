@@ -1,0 +1,12 @@
+.git
+.direnv
+result
+result-*
+secrets
+.env
+__pycache__
+*.pyc
+node_modules
+.next
+docs
+.claude

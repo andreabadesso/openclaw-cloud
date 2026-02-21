@@ -1,0 +1,86 @@
+from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
+
+
+class BoxResponse(BaseModel):
+    id: str
+    status: str
+    k8s_namespace: str
+    model: str
+    thinking_level: str
+    language: str
+    telegram_user_ids: list[int]
+    created_at: datetime
+    activated_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class UsageResponse(BaseModel):
+    tokens_used: int
+    tokens_limit: int
+    pct_used: float
+    period_start: datetime
+    period_end: datetime
+
+
+class ProvisionRequest(BaseModel):
+    telegram_bot_token: str
+    telegram_user_id: int
+    tier: str = Field(pattern=r"^(starter|pro|team)$")
+    model: str = "kimi-coding/k2p5"
+    thinking_level: str = "medium"
+    language: str = "en"
+    customer_email: str
+
+
+class UpdateBoxRequest(BaseModel):
+    telegram_user_ids: list[int] | None = None
+    model: str | None = None
+    thinking_level: str | None = None
+    language: str | None = None
+
+
+class BoxListItem(BaseModel):
+    id: str
+    customer_id: str
+    status: str
+    k8s_namespace: str
+    model: str
+    thinking_level: str
+    language: str
+    telegram_user_ids: list[int]
+    created_at: datetime
+    activated_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class BoxListResponse(BaseModel):
+    boxes: list[BoxListItem]
+
+
+class CustomerResponse(BaseModel):
+    id: str
+    email: str
+    stripe_customer_id: str | None = None
+    created_at: datetime
+    deleted_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class CustomerListResponse(BaseModel):
+    customers: list[CustomerResponse]
+
+
+class ProvisionResponse(BaseModel):
+    customer_id: str
+    box_id: str
+    job_id: str
+
+
+class JobEnqueuedResponse(BaseModel):
+    job_id: str
+    box_id: str

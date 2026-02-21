@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openclaw
+      POSTGRES_PASSWORD: openclaw
+      POSTGRES_DB: openclaw_cloud
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw_cloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://openclaw:openclaw@postgres:5432/openclaw_cloud
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: "http://localhost:3000"
+      DEBUG: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  token-proxy:
+    build:
+      context: .
+      dockerfile: apps/token-proxy/Dockerfile
+    ports:
+      - "8080:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://openclaw:openclaw@postgres:5432/openclaw_cloud
+      REDIS_URL: redis://redis:6379/0
+      KIMI_API_KEY: ${KIMI_API_KEY:-sk-test-placeholder}
+      KIMI_BASE_URL: ${KIMI_BASE_URL:-https://api.moonshot.cn/v1}
+      INTERNAL_API_KEY: dev-internal-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  operator:
+    build:
+      context: .
+      dockerfile: apps/operator/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://openclaw:openclaw@postgres:5432/openclaw_cloud
+      REDIS_URL: redis://redis:6379/0
+      TOKEN_PROXY_URL: http://token-proxy:8000
+      OPENCLAW_IMAGE: ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest
+      INTERNAL_API_KEY: dev-internal-key
+      KUBECONFIG: /root/.kube/config
+    volumes:
+      - /tmp/operator-kubeconfig.yaml:/root/.kube/config:ro
+    networks:
+      - default
+      - k3d-openclaw-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - api
+
+networks:
+  default:
+  k3d-openclaw-dev:
+    external: true
+
+volumes:
+  pgdata:

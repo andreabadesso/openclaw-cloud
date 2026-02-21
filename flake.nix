@@ -30,37 +30,46 @@
       };
 
       control-plane-1 = {
-        deployment.targetHost = clusterConfig.controlPlane.ip;
+        deployment.targetHost = clusterConfig.controlPlane.publicIp;
+        deployment.targetUser = "root";
         imports = [
           ./nodes/common.nix
           (./nodes/control-plane.nix)
         ];
         deployment.tags = [ "control-plane" ];
+        networking.hostName = "control-plane-1";
       };
 
       # Workers — add more entries here as you scale out
       worker-1 = {
-        deployment.targetHost = clusterConfig.workers."worker-1".ip;
+        deployment.targetHost = clusterConfig.workers."worker-1".publicIp;
+        deployment.targetUser = "root";
         imports = [ ./nodes/common.nix ./nodes/worker.nix ];
         deployment.tags = [ "worker" ];
+        networking.hostName = "worker-1";
       };
 
       worker-2 = {
-        deployment.targetHost = clusterConfig.workers."worker-2".ip;
+        deployment.targetHost = clusterConfig.workers."worker-2".publicIp;
+        deployment.targetUser = "root";
         imports = [ ./nodes/common.nix ./nodes/worker.nix ];
         deployment.tags = [ "worker" ];
+        networking.hostName = "worker-2";
       };
     };
 
-    # ─── Kubernetes platform manifests (kubenix) ────────────────────────────
-    packages.${system}.k8s-manifests =
-      (kubenix.evalModules.${system} {
-        module = import ./k8s { inherit inputs; };
-      }).config.kubernetes.result;
+    # ─── Packages ──────────────────────────────────────────────────────────
+    packages.${system} = {
+      # Kubernetes platform manifests (kubenix)
+      k8s-manifests =
+        (kubenix.evalModules.${system} {
+          module = import ./k8s { inherit inputs; };
+        }).config.kubernetes.result;
 
-    # ─── OpenClaw container image (nix2container) ───────────────────────────
-    packages.${system}.openclaw-image =
-      import ./images/openclaw-gateway.nix { inherit pkgs n2c nix-openclaw; };
+      # OpenClaw container image (nix2container)
+      openclaw-image =
+        import ./images/openclaw-gateway.nix { inherit pkgs n2c nix-openclaw; };
+    };
 
     # ─── Dev shell ──────────────────────────────────────────────────────────
     devShells.${system}.default = pkgs.mkShell {
