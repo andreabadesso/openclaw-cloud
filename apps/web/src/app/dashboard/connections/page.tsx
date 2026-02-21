@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Nango from "@nangohq/frontend";
 import { api, type Connection } from "@/lib/api";
 
 const PROVIDERS = [
@@ -38,23 +39,27 @@ export default function ConnectionsPage() {
     setActionLoading(providerId);
     try {
       const session = await api.authorizeConnection(providerId);
-      const popup = window.open(session.connect_url, "_blank", "width=600,height=700");
 
-      // Poll for popup close, then confirm the connection
-      const interval = setInterval(async () => {
-        if (popup?.closed) {
-          clearInterval(interval);
-          try {
-            await api.confirmConnection(providerId);
-          } catch {
-            // Connection may not have completed — that's OK
-          }
-          fetchConnections();
-          setActionLoading(null);
-        }
-      }, 1000);
+      const nango = new Nango({
+        host: "http://localhost:3003",
+        connectSessionToken: session.session_token,
+      });
+
+      await nango.auth(providerId);
+
+      // After successful OAuth, confirm the connection
+      try {
+        await api.confirmConnection(providerId);
+      } catch {
+        // Connection may not have completed
+      }
+      fetchConnections();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to connect");
+      const msg = e instanceof Error ? e.message : "Failed to connect";
+      if (!msg.includes("window_closed")) {
+        setError(msg);
+      }
+    } finally {
       setActionLoading(null);
     }
   }
@@ -71,21 +76,30 @@ export default function ConnectionsPage() {
     }
   }
 
-  async function handleReconnect(connectionId: string) {
+  async function handleReconnect(connectionId: string, providerId: string) {
     setActionLoading(connectionId);
     try {
       const session = await api.reconnectConnection(connectionId);
-      const popup = window.open(session.connect_url, "_blank", "width=600,height=700");
 
-      const interval = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(interval);
-          fetchConnections();
-          setActionLoading(null);
-        }
-      }, 1000);
+      const nango = new Nango({
+        host: "http://localhost:3003",
+        connectSessionToken: session.session_token,
+      });
+
+      await nango.auth(providerId);
+
+      try {
+        await api.confirmConnection(providerId);
+      } catch {
+        // Connection may not have completed
+      }
+      fetchConnections();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to reconnect");
+      const msg = e instanceof Error ? e.message : "Failed to reconnect";
+      if (!msg.includes("window_closed")) {
+        setError(msg);
+      }
+    } finally {
       setActionLoading(null);
     }
   }
@@ -160,7 +174,7 @@ export default function ConnectionsPage() {
                 )}
                 {isError && conn && (
                   <button
-                    onClick={() => handleReconnect(conn.id)}
+                    onClick={() => handleReconnect(conn.id, provider.id)}
                     disabled={isLoading}
                     className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >

@@ -27,49 +27,8 @@ let
     # Build allowFrom JSON array from comma-separated string
     ALLOW_ARRAY=$(printf '%s' "$ALLOW_FROM" | tr ',' '\n' | sed '/^$/d' | sed 's/^/    /;s/$/,/' | sed '$ s/,$//')
 
-    # Write openclaw config JSON
-    cat > "$OPENCLAW_STATE_DIR/openclaw.json" << EOJSON
-    {
-      "commands": {
-        "native": "auto",
-        "nativeSkills": "auto",
-        "restart": true
-      },
-      "gateway": {
-        "mode": "local"
-      },
-      "auth": {
-        "profiles": {
-          "default": {
-            "provider": "$PROVIDER",
-            "mode": "api_key"
-          }
-        },
-        "order": {
-          "*": ["default"]
-        }
-      },
-      "agents": {
-        "defaults": {
-          "model": {
-            "primary": "$MODEL"
-          },
-          "thinkingDefault": "$THINKING"
-        }
-      },
-      "channels": {
-        "telegram": {
-          "tokenFile": "$TOKEN_FILE",
-          "allowFrom": [
-    $ALLOW_ARRAY
-          ]
-        }
-      }
-    }
-    EOJSON
-
     # Generate AGENTS.md from OPENCLAW_CONNECTIONS if set
-    WORKSPACE_DIR="$OPENCLAW_STATE_DIR/workspace"
+    WORKSPACE_DIR="/root/workspace"
     mkdir -p "$WORKSPACE_DIR"
     CONNECTIONS_JSON="''${OPENCLAW_CONNECTIONS:-}"
     if [ -n "$CONNECTIONS_JSON" ]; then
@@ -77,51 +36,94 @@ let
       AGENT_API_SECRET=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.api_secret')
       AGENT_CUSTOMER_ID=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.customer_id')
 
-      cat > "$WORKSPACE_DIR/AGENTS.md" << 'EOAGENTS'
+      NANGO_PROXY_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_proxy_url')
+      NANGO_SECRET_KEY=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_secret_key')
+      CONN_LIST=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.connections[] | "- **\(.provider)**: connection_id=`\(.connection_id)`"')
+
+      cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
 # External Service Connections
 
-You can connect to external services (GitHub, Slack, Linear, Google, Notion, Jira)
-on behalf of the user via authenticated API calls through a proxy.
+You have access to external services via an authenticated proxy. Use \`web_fetch\` to make API calls.
 
-## Step 1: Check available connections
+## Connected Services
 
-Before making any external API call, first check which services are connected:
+$CONN_LIST
 
-```bash
-curl -s __API_URL__/internal/agent/connections \
-  -H "Authorization: Bearer __API_SECRET__" \
-  -H "X-Customer-Id: __CUSTOMER_ID__"
-```
+## How to Make API Calls
 
-This returns JSON with:
-- `connections`: list of connected providers with `connection_id`, plus a `proxy_url` and headers to use
-- `available_providers`: list of providers the user could connect but hasn't yet
+Use the \`web_fetch\` tool to call external APIs through the Nango proxy at:
+\`$NANGO_PROXY_URL/proxy\`
 
-## Step 2: Make API calls through the proxy
+Required headers for every proxy request:
+- \`Authorization: Bearer $NANGO_SECRET_KEY\`
+- \`Connection-Id: <connection_id from above>\`
+- \`Provider-Config-Key: <provider name>\`
 
-Use the `proxy_url`, `connection_id`, and `headers` from the response above.
-The response includes ready-to-use curl examples for each connected provider.
+### Google Drive Example
 
-## Step 3: Request new connections
+To list Google Drive files, use web_fetch with:
+- URL: \`$NANGO_PROXY_URL/proxy/drive/v3/files?pageSize=10\`
+- Headers: \`Authorization: Bearer $NANGO_SECRET_KEY\`, \`Connection-Id: <google_connection_id>\`, \`Provider-Config-Key: google\`
 
-If you need a service that isn't connected, generate a one-click OAuth link:
+### Google Sheets Example
 
-```bash
-curl -s -X POST __API_URL__/internal/agent/connect-link \
-  -H "Authorization: Bearer __API_SECRET__" \
-  -H "Content-Type: application/json" \
-  -d '{"customer_id":"__CUSTOMER_ID__","provider":"<provider_name>"}'
-```
+- URL: \`$NANGO_PROXY_URL/proxy/v4/spreadsheets/<spreadsheet_id>\`
+- Same headers as above.
 
-This returns `{"url":"..."}`. Send that URL to the user — they click it,
-complete OAuth in their browser, and the connection becomes available shortly after.
+### Requesting New Connections
+
+If the user asks for a service that is not connected, use web_fetch to POST to:
+\`$AGENT_API_URL/internal/agent/connect-link\`
+with headers \`Authorization: Bearer $AGENT_API_SECRET\` and \`Content-Type: application/json\`
+and body \`{"customer_id":"$AGENT_CUSTOMER_ID","provider":"<provider_name>"}\`
+
+This returns a URL. Send it to the user so they can complete OAuth in their browser.
 
 Available providers: github, google, slack, linear, notion, jira
 EOAGENTS
-
-      # Substitute placeholders with actual values
-      sed -i "s|__API_URL__|$AGENT_API_URL|g;s|__API_SECRET__|$AGENT_API_SECRET|g;s|__CUSTOMER_ID__|$AGENT_CUSTOMER_ID|g" "$WORKSPACE_DIR/AGENTS.md"
     fi
+
+    # Write openclaw config JSON (after workspace setup so gateway doesn't wipe it)
+    cat > "$OPENCLAW_STATE_DIR/openclaw.json" << EOJSON
+{
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true
+  },
+  "gateway": {
+    "mode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "default": {
+        "provider": "$PROVIDER",
+        "mode": "api_key"
+      }
+    },
+    "order": {
+      "*": ["default"]
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "$WORKSPACE_DIR",
+      "model": {
+        "primary": "$MODEL"
+      },
+      "thinkingDefault": "$THINKING"
+    }
+  },
+  "channels": {
+    "telegram": {
+      "tokenFile": "$TOKEN_FILE",
+      "allowFrom": [
+$ALLOW_ARRAY
+      ]
+    }
+  }
+}
+EOJSON
 
     exec ${openclaw}/bin/openclaw gateway
   '';

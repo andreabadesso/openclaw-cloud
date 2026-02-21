@@ -1,5 +1,8 @@
 const API_URL = "/api";
 
+// TODO: Replace with real JWT auth
+const DEV_CUSTOMER_ID = "b542035c-93c5-4901-bea7-d3b5037a6288";
+
 async function request<T>(
   path: string,
   options?: RequestInit,
@@ -7,6 +10,7 @@ async function request<T>(
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      "X-Customer-Id": DEV_CUSTOMER_ID,
       ...options?.headers,
     },
     ...options,

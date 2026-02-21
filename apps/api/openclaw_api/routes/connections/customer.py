@@ -78,20 +78,23 @@ async def confirm_connection(
 ):
     """Called by the frontend after a successful OAuth popup to sync the connection locally."""
     # Verify the connection exists in Nango
-    connection_id = f"{customer_id}_{provider}"
     try:
-        connections = await nango.list_connections(search=customer_id)
+        all_connections = await nango.list_connections()
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Nango error: {exc}") from exc
 
     nango_conn = next(
-        (c for c in connections if c.get("provider_config_key", c.get("provider", "")) == provider),
+        (
+            c for c in all_connections
+            if c.get("provider_config_key", c.get("provider", "")) == provider
+            and c.get("end_user", {}).get("id") == customer_id
+        ),
         None,
     )
     if not nango_conn:
         raise HTTPException(status_code=404, detail="Connection not found in Nango")
 
-    actual_connection_id = nango_conn.get("connection_id", connection_id)
+    actual_connection_id = nango_conn.get("connection_id", f"{customer_id}_{provider}")
 
     # Upsert local tracking record
     result = await db.execute(
