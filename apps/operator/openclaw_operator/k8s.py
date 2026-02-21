@@ -26,6 +26,7 @@ from kubernetes.client import (
     V1SecretEnvSource,
 )
 
+from .config import settings
 from .tiers import TIER_RESOURCES, get_quota_hard
 
 logger = logging.getLogger(__name__)
@@ -120,7 +121,7 @@ def create_config_secret(
                 "TELEGRAM_BOT_TOKEN": telegram_bot_token,
                 "TELEGRAM_ALLOW_FROM": telegram_allow_from,
                 "KIMI_API_KEY": proxy_token,
-                "KIMI_BASE_URL": "http://token-proxy.platform.svc.cluster.local:8080/v1",
+                "KIMI_BASE_URL": f"{settings.token_proxy_url}/v1",
                 "OPENCLAW_MODEL": model,
                 "OPENCLAW_THINKING": thinking,
                 "NODE_OPTIONS": "--max-old-space-size=896",
