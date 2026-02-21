@@ -8,7 +8,7 @@ let
     { name = "REDIS_URL";       valueFrom.secretKeyRef = { name = "platform-secrets"; key = "redis_url";       }; }
     { name = "KIMI_API_KEY";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "kimi_api_key";    }; }
     { name = "INTERNAL_API_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "internal_api_key"; }; }
-    { name = "KIMI_UPSTREAM";   value = "https://api.moonshot.cn"; }
+    { name = "MODEL";             value = "kimi-coding/k2p5"; }
     { name = "PORT";            value = "8080"; }
     { name = "LOG_LEVEL";       value = "info"; }
   ];
