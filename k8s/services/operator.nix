@@ -19,6 +19,7 @@ in {
                 { name = "DATABASE_URL";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "postgres_url"; }; }
                 { name = "REDIS_URL";       valueFrom.secretKeyRef = { name = "platform-secrets"; key = "redis_url"; }; }
                 { name = "TOKEN_PROXY_URL"; value = "http://token-proxy.platform.svc.cluster.local:8080"; }
+                { name = "INTERNAL_API_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "internal_api_key"; }; }
                 { name = "NANGO_SERVER_URL"; value = "http://nango-server.platform.svc.cluster.local:8080"; }
                 { name = "NANGO_SECRET_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_secret_key"; }; }
                 { name = "AGENT_API_SECRET"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "agent_api_secret"; }; }
