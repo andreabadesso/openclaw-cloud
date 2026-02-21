@@ -12,19 +12,41 @@ A managed platform that gives every customer their own personal AI agent — iso
 4. Customer connects external services (Google, GitHub, Slack, etc.) via OAuth
 5. Agent calls external APIs through the Nango proxy — tokens refresh automatically
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         K8s Cluster                                  │
-│                                                                      │
-│  ┌─ platform ──────────────────────────────────────────────────┐     │
-│  │  API ─── Operator ─── Token Proxy ─── Nango ─── Postgres   │     │
-│  └─────────────────────────────────────────────────────────────┘     │
-│                                                                      │
-│  ┌─ customer-abc ──────────┐  ┌─ customer-def ──────────┐           │
-│  │  openclaw-gateway       │  │  openclaw-gateway       │           │
-│  │  (Telegram bot + agent) │  │  (Telegram bot + agent) │           │
-│  └─────────────────────────┘  └─────────────────────────┘           │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+  subgraph cluster["K8s Cluster"]
+    subgraph platform["platform namespace"]
+      web["Web<br/><small>Next.js</small>"]
+      api["API<br/><small>FastAPI</small>"]
+      operator["Operator"]
+      proxy["Token Proxy"]
+      nango["Nango<br/><small>OAuth</small>"]
+      pg[("Postgres")]
+      redis[("Redis")]
+
+      web --> api
+      api --> pg
+      api --> redis
+      operator --> redis
+      proxy --> pg
+    end
+
+    subgraph c1["customer-abc"]
+      gw1["openclaw-gateway<br/><small>Telegram bot + AI agent</small>"]
+    end
+
+    subgraph c2["customer-def"]
+      gw2["openclaw-gateway"]
+    end
+
+    gw1 -- "LLM calls<br/>(proxy token)" --> proxy
+    gw1 -- "Google, GitHub..." --> nango
+    operator -- "provisions" --> c1
+    operator -- "provisions" --> c2
+  end
+
+  proxy -- "Kimi API" --> moonshot(("Moonshot"))
+  nango -- "OAuth tokens" --> google(("Google, GitHub,<br/>Slack, ..."))
 ```
 
 Each customer is fully isolated: own namespace, resource quota, network policy. Customer pods never hold real API keys — LLM calls go through the token proxy with per-customer metering and rate limits.
@@ -33,26 +55,35 @@ Each customer is fully isolated: own namespace, resource quota, network policy. 
 
 Agents can access external services on behalf of the user. This is powered by a self-hosted [Nango](https://nango.dev) instance that handles the entire OAuth lifecycle:
 
-```
-User clicks "Connect Google" in dashboard
-        │
-        v
-Nango OAuth popup ──> Google consent screen ──> callback
-        │
-        v
-API saves connection ──> operator patches pod secret
-        │
-        v
-Agent pod restarts with OPENCLAW_CONNECTIONS env var
-        │
-        v
-Agent reads AGENTS.md ──> knows how to call Google Drive via Nango proxy
-        │
-        v
-Agent runs: curl nango-server/proxy/drive/v3/files -H "Authorization: Bearer <key>"
-        │
-        v
-Nango injects the user's OAuth token, refreshes if expired, forwards to Google
+```mermaid
+sequenceDiagram
+  actor User
+  participant Dashboard
+  participant Nango
+  participant Google
+  participant API
+  participant Operator
+  participant Agent as Agent Pod
+
+  User->>Dashboard: Click "Connect Google"
+  Dashboard->>Nango: Open OAuth popup
+  Nango->>Google: Redirect to consent screen
+  Google-->>Nango: Authorization code
+  Nango-->>Dashboard: Connection created
+
+  Dashboard->>API: POST /connections/confirm
+  API->>Operator: Enqueue update_connections job
+  Operator->>Agent: Patch secret + restart pod
+
+  Note over Agent: Pod starts with<br/>OPENCLAW_CONNECTIONS env var
+
+  User->>Agent: "List my Google Drive files"
+  Agent->>Nango: curl /proxy/drive/v3/files
+  Note over Nango: Injects OAuth token<br/>(auto-refreshes if expired)
+  Nango->>Google: GET /drive/v3/files
+  Google-->>Nango: File list
+  Nango-->>Agent: File list
+  Agent-->>User: "Here are your files..."
 ```
 
 Supported providers: **Google** (Drive, Sheets, Calendar), **GitHub**, **Slack**, **Linear**, **Notion**, **Jira** — with 600+ more available through Nango.
