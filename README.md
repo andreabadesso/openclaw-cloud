@@ -376,9 +376,10 @@ result/bin/copy-to docker://ghcr.io/andreabadesso/openclaw-cloud/openclaw-gatewa
 - [x] Admin provisioning panel
 - [x] K8s pod lifecycle (provision, suspend, reactivate, destroy)
 - [x] OpenClaw gateway container image (nix2container)
-- [x] Local dev environment (k3d)
+- [x] Local dev environment (k3d) — all services in-cluster, no Docker Compose runtime
 - [x] Nango-powered OAuth connections (GitHub, Slack, Linear, Google, Notion, Jira)
 - [x] Agent connection discovery API + deep-link generation
+- [x] Agent → Nango proxy integration (exec curl with auto token refresh)
 - [ ] JWT RS256 authentication
 - [ ] Stripe billing integration
 - [ ] Conversational onboarding agent (Kimi + LangChain)
