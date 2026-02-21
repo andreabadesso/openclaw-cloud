@@ -2,10 +2,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install shared package first
-COPY apps/shared/ /tmp/shared/
-RUN pip install --no-cache-dir /tmp/shared/ && rm -rf /tmp/shared/
-
 # Install token-proxy service
 COPY apps/token-proxy/pyproject.toml .
 RUN pip install --no-cache-dir .

@@ -7,7 +7,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from openclaw_shared.database import Base
+from openclaw_api.models import Base
 
 target_metadata = Base.metadata
 

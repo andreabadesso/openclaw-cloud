@@ -284,11 +284,6 @@ openclaw-cloud/
 │   │       │   └── onboarding/   # Onboarding flow (placeholder)
 │   │       ├── components/       # Reusable UI components
 │   │       └── lib/api.ts        # API client (proxied via Next.js rewrites)
-│   │
-│   └── shared/                   # Shared Python library
-│       └── openclaw_shared/
-│           ├── database.py       # Async SQLAlchemy engine + models
-│           └── redis.py          # Redis client setup
 │
 ├── images/
 │   └── openclaw-gateway.nix      # nix2container image for customer pods
