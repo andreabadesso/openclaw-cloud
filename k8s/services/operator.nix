@@ -16,9 +16,14 @@ in {
             containers.operator = {
               inherit image;
               env = [
-                { name = "POSTGRES_URL";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "postgres_url"; }; }
+                { name = "DATABASE_URL";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "postgres_url"; }; }
                 { name = "REDIS_URL";       valueFrom.secretKeyRef = { name = "platform-secrets"; key = "redis_url"; }; }
                 { name = "TOKEN_PROXY_URL"; value = "http://token-proxy.platform.svc.cluster.local:8080"; }
+                { name = "NANGO_SERVER_URL"; value = "http://nango-server.platform.svc.cluster.local:8080"; }
+                { name = "NANGO_SECRET_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_secret_key"; }; }
+                { name = "AGENT_API_SECRET"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "agent_api_secret"; }; }
+                { name = "API_URL";          value = "http://api.platform.svc.cluster.local:8000"; }
+                { name = "WEB_URL";          value = "http://localhost:3000"; }
                 { name = "KUBE_NAMESPACE_PREFIX"; value = "customer-"; }
                 { name = "OPENCLAW_IMAGE";  value = "ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest"; }
               ];

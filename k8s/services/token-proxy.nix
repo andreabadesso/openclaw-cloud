@@ -4,7 +4,7 @@ let
   image = "ghcr.io/andreabadesso/openclaw-cloud/token-proxy:latest";
 
   commonEnv = [
-    { name = "POSTGRES_URL";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "postgres_url";    }; }
+    { name = "DATABASE_URL";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "postgres_url";    }; }
     { name = "REDIS_URL";       valueFrom.secretKeyRef = { name = "platform-secrets"; key = "redis_url";       }; }
     { name = "KIMI_API_KEY";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "kimi_api_key";    }; }
     { name = "KIMI_UPSTREAM";   value = "https://api.moonshot.cn"; }
