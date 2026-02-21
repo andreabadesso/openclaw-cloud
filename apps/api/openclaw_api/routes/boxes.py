@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from openclaw_api.deps import get_current_customer_id, get_db, get_redis
+from openclaw_api.deps import get_active_box_or_none, get_current_customer_id, get_db, get_redis
 from openclaw_api.jobs import enqueue_job
 from openclaw_api.models import Box, BoxStatus, OperatorJob, JobType, JobStatus
 from openclaw_api.schemas import BoxResponse, UpdateBoxRequest, JobEnqueuedResponse
@@ -36,13 +36,7 @@ async def update_my_box(
     db: AsyncSession = Depends(get_db),
     r: aioredis.Redis = Depends(get_redis),
 ):
-    result = await db.execute(
-        select(Box)
-        .where(Box.customer_id == customer_id)
-        .where(Box.status == BoxStatus.active)
-        .limit(1)
-    )
-    box = result.scalar_one_or_none()
+    box = await get_active_box_or_none(customer_id, db)
     if not box:
         raise HTTPException(status_code=404, detail="No active box found")
 

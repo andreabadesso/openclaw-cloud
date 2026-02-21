@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
 from fastapi import Depends, Header, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openclaw_api.config import settings
@@ -36,3 +37,15 @@ async def get_current_customer_id(
     if not x_customer_id:
         raise HTTPException(status_code=401, detail="Missing X-Customer-Id header")
     return x_customer_id
+
+
+async def get_active_box_or_none(customer_id: str, db: AsyncSession):
+    from openclaw_api.models import Box, BoxStatus
+
+    result = await db.execute(
+        select(Box)
+        .where(Box.customer_id == customer_id)
+        .where(Box.status == BoxStatus.active)
+        .limit(1)
+    )
+    return result.scalar_one_or_none()

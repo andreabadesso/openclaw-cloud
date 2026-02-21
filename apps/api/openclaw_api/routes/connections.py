@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openclaw_api.config import settings
-from openclaw_api.deps import get_current_customer_id, get_db, get_redis
+from openclaw_api.deps import get_active_box_or_none, get_current_customer_id, get_db, get_redis
 from openclaw_api.jobs import enqueue_job
 from openclaw_api.models import (
     Box,
@@ -117,13 +117,7 @@ async def confirm_connection(
         ))
 
     # Enqueue update_connections job so the pod secret gets updated
-    box_result = await db.execute(
-        select(Box)
-        .where(Box.customer_id == customer_id)
-        .where(Box.status == BoxStatus.active)
-        .limit(1)
-    )
-    box = box_result.scalar_one_or_none()
+    box = await get_active_box_or_none(customer_id, db)
     if box:
         job = OperatorJob(
             customer_id=customer_id,
@@ -171,13 +165,7 @@ async def delete_connection(
         conn.status = "deleted"
 
     # Enqueue update_connections job for any active box
-    box_result = await db.execute(
-        select(Box)
-        .where(Box.customer_id == customer_id)
-        .where(Box.status == BoxStatus.active)
-        .limit(1)
-    )
-    box = box_result.scalar_one_or_none()
+    box = await get_active_box_or_none(customer_id, db)
     if box:
         job = OperatorJob(
             customer_id=customer_id,
