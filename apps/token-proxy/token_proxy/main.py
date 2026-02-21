@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from token_proxy import config
+from token_proxy.config import settings
 from token_proxy.auth import authenticate_token
 from token_proxy.internal import router as internal_router
 from token_proxy.limits import check_limits
@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Startup
-    engine = create_async_engine(config.DATABASE_URL, pool_size=10, max_overflow=5)
+    engine = create_async_engine(settings.database_url, pool_size=10, max_overflow=5)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    redis = aioredis.from_url(config.REDIS_URL, decode_responses=True)
+    redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     http_client = httpx.AsyncClient(
         timeout=httpx.Timeout(120.0, connect=10.0),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),

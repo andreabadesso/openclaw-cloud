@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from token_proxy.config import USAGE_FLUSH_BATCH_SIZE, USAGE_FLUSH_INTERVAL_S
+from token_proxy.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,8 @@ async def start_usage_consumer(
                 CONSUMER_GROUP,
                 CONSUMER_NAME,
                 {STREAM_KEY: ">"},
-                count=USAGE_FLUSH_BATCH_SIZE,
-                block=int(USAGE_FLUSH_INTERVAL_S * 1000),
+                count=settings.usage_flush_batch_size,
+                block=int(settings.usage_flush_interval_s * 1000),
             )
 
             if messages:
@@ -83,7 +83,7 @@ async def start_usage_consumer(
                         )
 
             elapsed = time.monotonic() - last_flush
-            if batch and (len(batch) >= USAGE_FLUSH_BATCH_SIZE or elapsed >= USAGE_FLUSH_INTERVAL_S):
+            if batch and (len(batch) >= settings.usage_flush_batch_size or elapsed >= settings.usage_flush_interval_s):
                 await _flush_batch(batch, redis, session_factory)
                 # ACK processed messages
                 msg_ids = [e["msg_id"] for e in batch]

@@ -9,7 +9,7 @@ import httpx
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
-from token_proxy.config import KIMI_API_KEY, KIMI_BASE_URL
+from token_proxy.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,9 @@ async def forward_request(
     body_json = json.loads(body)
     is_streaming = body_json.get("stream", False)
 
-    upstream_url = f"{KIMI_BASE_URL}/chat/completions"
+    upstream_url = f"{settings.kimi_base_url}/chat/completions"
     headers = {
-        "Authorization": f"Bearer {KIMI_API_KEY}",
+        "Authorization": f"Bearer {settings.kimi_api_key}",
         "Content-Type": "application/json",
     }
 

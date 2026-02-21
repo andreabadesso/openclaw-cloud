@@ -4,7 +4,7 @@ import time
 
 from redis.asyncio import Redis
 
-from token_proxy.config import RATE_LIMIT_RPS
+from token_proxy.config import settings
 
 RATE_LIMIT_SCRIPT = """
 local key = KEYS[1]
@@ -44,8 +44,8 @@ async def check_rate_limit(customer_id: str, redis: Redis) -> bool:
         RATE_LIMIT_SCRIPT,
         1,
         key,
-        RATE_LIMIT_RPS,  # capacity
+        settings.rate_limit_rps,  # capacity
         now,
-        RATE_LIMIT_RPS,  # refill_rate = capacity per second
+        settings.rate_limit_rps,  # refill_rate = capacity per second
     )
     return bool(result)

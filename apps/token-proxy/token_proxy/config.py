@@ -1,35 +1,17 @@
-from __future__ import annotations
-
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
+from pydantic_settings import BaseSettings
 
 
-def _require(name: str) -> str:
-    val = os.getenv(name)
-    if not val:
-        raise RuntimeError(f"Missing required env var: {name}")
-    return val
+class Settings(BaseSettings):
+    kimi_api_key: str
+    kimi_base_url: str = "https://api.moonshot.cn/v1"
+    database_url: str = "postgresql+asyncpg://localhost/openclaw_cloud"
+    redis_url: str = "redis://localhost:6379/0"
+    internal_api_key: str = ""
+    rate_limit_rps: int = 10
+    usage_flush_interval_s: float = 5.0
+    usage_flush_batch_size: int = 100
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-# Upstream Kimi API
-KIMI_API_KEY: str = _require("KIMI_API_KEY")
-KIMI_BASE_URL: str = os.getenv("KIMI_BASE_URL", "https://api.moonshot.cn/v1")
-
-# Postgres
-DATABASE_URL: str = _require("DATABASE_URL")  # asyncpg:// or postgresql+asyncpg://
-
-# Redis
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-# Internal API shared secret
-INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY", "")
-
-# Rate limiting
-RATE_LIMIT_RPS: int = int(os.getenv("RATE_LIMIT_RPS", "10"))
-
-# Usage consumer tuning
-USAGE_FLUSH_INTERVAL_S: float = float(os.getenv("USAGE_FLUSH_INTERVAL_S", "5"))
-USAGE_FLUSH_BATCH_SIZE: int = int(os.getenv("USAGE_FLUSH_BATCH_SIZE", "100"))
+settings = Settings()

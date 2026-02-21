@@ -11,13 +11,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from token_proxy.auth import TOKEN_CACHE_PREFIX
-from token_proxy.config import INTERNAL_API_KEY
+from token_proxy.config import settings
 
 router = APIRouter(prefix="/internal")
 
 
 def _verify_internal_key(x_internal_key: str = Header(...)) -> None:
-    if not INTERNAL_API_KEY or x_internal_key != INTERNAL_API_KEY:
+    if not settings.internal_api_key or x_internal_key != settings.internal_api_key:
         raise HTTPException(status_code=403, detail="Invalid internal API key")
 
 
