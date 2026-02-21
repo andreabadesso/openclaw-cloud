@@ -7,8 +7,10 @@
 
     ./namespaces.nix
     ./infrastructure/redis.nix
+    ./infrastructure/postgres.nix
     ./infrastructure/ingress.nix
     ./services/api.nix
+    ./services/nango.nix
     ./services/web.nix
     ./services/token-proxy.nix
     ./services/operator.nix
