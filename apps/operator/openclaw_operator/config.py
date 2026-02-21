@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     job_queue: str = Field(default="operator:jobs")
     health_port: int = Field(default=8081)
     pod_ready_timeout: int = Field(default=60)
+    nango_server_url: str = Field(default="http://nango-server.platform.svc.cluster.local:8080")
+    nango_secret_key: str = Field(default="")
 
     model_config = {"env_prefix": "", "case_sensitive": False}
 

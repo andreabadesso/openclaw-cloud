@@ -84,3 +84,27 @@ class ProvisionResponse(BaseModel):
 class JobEnqueuedResponse(BaseModel):
     job_id: str
     box_id: str
+
+
+class ConnectionResponse(BaseModel):
+    id: str
+    provider: str
+    status: str
+    created_at: datetime | None = None
+
+
+class ConnectionListResponse(BaseModel):
+    connections: list[ConnectionResponse]
+
+
+class ConnectSessionResponse(BaseModel):
+    session_token: str
+    connect_url: str
+
+
+class ConnectLinkRequest(BaseModel):
+    provider: str
+
+
+class ConnectLinkResponse(BaseModel):
+    url: str

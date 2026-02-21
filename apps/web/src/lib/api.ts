@@ -43,6 +43,18 @@ export interface ProvisionRequest {
   language: string;
 }
 
+export interface Connection {
+  id: string;
+  provider: string;
+  status: string;
+  created_at: string | null;
+}
+
+export interface ConnectSession {
+  session_token: string;
+  connect_url: string;
+}
+
 export const api = {
   getBoxes: async (): Promise<Box[]> => {
     const data = await request<{ boxes: Box[] }>("/internal/boxes");
@@ -63,4 +75,25 @@ export const api = {
 
   destroyBox: (id: string) =>
     request(`/internal/destroy/${id}`, { method: "POST" }),
+
+  getConnections: async (): Promise<Connection[]> => {
+    const data = await request<{ connections: Connection[] }>("/me/connections");
+    return data.connections;
+  },
+
+  authorizeConnection: (provider: string) =>
+    request<ConnectSession>(`/me/connections/${provider}/authorize`, {
+      method: "POST",
+    }),
+
+  confirmConnection: (provider: string) =>
+    request(`/me/connections/${provider}/confirm`, { method: "POST" }),
+
+  deleteConnection: (id: string) =>
+    request(`/me/connections/${id}`, { method: "DELETE" }),
+
+  reconnectConnection: (id: string) =>
+    request<ConnectSession>(`/me/connections/${id}/reconnect`, {
+      method: "POST",
+    }),
 };

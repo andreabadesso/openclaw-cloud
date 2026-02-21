@@ -22,6 +22,7 @@ from .jobs.reactivate import handle_reactivate
 from .jobs.resize import handle_resize
 from .jobs.suspend import handle_suspend
 from .jobs.update import handle_update
+from .jobs.update_connections import handle_update_connections
 from .k8s import init_k8s
 
 logging.basicConfig(
@@ -37,6 +38,7 @@ JOB_HANDLERS = {
     "reactivate": handle_reactivate,
     "update": handle_update,
     "resize": handle_resize,
+    "update_connections": handle_update_connections,
 }
 
 # Global state

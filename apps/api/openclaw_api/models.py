@@ -70,6 +70,7 @@ class JobType(str, enum.Enum):
     reactivate = "reactivate"
     resize = "resize"
     health_check = "health_check"
+    update_connections = "update_connections"
 
 
 class JobStatus(str, enum.Enum):
@@ -223,6 +224,23 @@ class OnboardingSession(Base):
     __table_args__ = (
         Index("ix_onboarding_sessions_session_token", "session_token"),
         Index("ix_onboarding_sessions_expires_at", "expires_at", postgresql_where="state NOT IN ('complete', 'failed')"),
+    )
+
+
+class CustomerConnection(Base):
+    __tablename__ = "customer_connections"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, server_default=func.gen_random_uuid())
+    customer_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("customers.id"), nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    nango_connection_id: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_customer_connections_customer_id", "customer_id"),
+        UniqueConstraint("customer_id", "provider", name="uq_customer_connections_customer_provider"),
     )
 
 

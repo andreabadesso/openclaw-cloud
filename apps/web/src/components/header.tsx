@@ -14,6 +14,9 @@ export function Header() {
           <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
             Dashboard
           </Link>
+          <Link href="/dashboard/connections" className="text-muted-foreground hover:text-foreground">
+            Connections
+          </Link>
           <Link
             href="/onboarding"
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"

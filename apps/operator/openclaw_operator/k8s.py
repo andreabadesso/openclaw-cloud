@@ -197,7 +197,21 @@ def create_network_policy(customer_id: str) -> None:
                         ],
                         ports=[V1NetworkPolicyPort(port=8080)],
                     ),
-                    # Rule 2: Allow egress to Telegram (public IPs, port 443)
+                    # Rule 2: Allow egress to Nango proxy in platform namespace
+                    V1NetworkPolicyEgressRule(
+                        to=[
+                            V1NetworkPolicyPeer(
+                                namespace_selector=V1LabelSelector(
+                                    match_labels={"kubernetes.io/metadata.name": "platform"},
+                                ),
+                                pod_selector=V1LabelSelector(
+                                    match_labels={"app": "nango-server"},
+                                ),
+                            ),
+                        ],
+                        ports=[V1NetworkPolicyPort(port=8080)],
+                    ),
+                    # Rule 3: Allow egress to Telegram (public IPs, port 443)
                     V1NetworkPolicyEgressRule(
                         to=[
                             V1NetworkPolicyPeer(
@@ -213,7 +227,7 @@ def create_network_policy(customer_id: str) -> None:
                         ],
                         ports=[V1NetworkPolicyPort(port=443)],
                     ),
-                    # Rule 3: Allow CoreDNS (UDP 53)
+                    # Rule 4: Allow CoreDNS (UDP 53)
                     V1NetworkPolicyEgressRule(
                         ports=[V1NetworkPolicyPort(port=53, protocol="UDP")],
                     ),

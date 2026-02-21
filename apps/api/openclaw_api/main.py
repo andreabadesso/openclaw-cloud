@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from openclaw_api.config import settings
 from openclaw_api.database import engine
 from openclaw_api.deps import close_redis
-from openclaw_api.routes import boxes, health, internal, usage
+from openclaw_api.routes import boxes, connections, health, internal, usage
 
 
 @asynccontextmanager
@@ -30,3 +30,4 @@ app.include_router(health.router)
 app.include_router(boxes.router)
 app.include_router(usage.router)
 app.include_router(internal.router)
+app.include_router(connections.router)
