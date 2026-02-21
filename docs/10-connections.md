@@ -233,9 +233,27 @@ jira:
     audience: api.atlassian.com
     prompt: consent
   refresh_strategy: standard
+
+# --- API Key providers ---
+
+openai:
+  display_name: OpenAI
+  auth_mode: api_key
+  proxy_base_url: https://api.openai.com
+  auth_header: Authorization
+  auth_prefix: "Bearer "
+
+custom:
+  display_name: Custom API
+  auth_mode: api_key
+  proxy_base_url: null          # customer provides the base URL
+  auth_header: Authorization
+  auth_prefix: "Bearer "
 ```
 
-Adding a new provider = add a YAML entry + register an OAuth app with that provider + add client_id/secret to `platform-secrets`.
+Adding a new OAuth provider = add a YAML entry + register an OAuth app with that provider + add client_id/secret to `platform-secrets`.
+
+Adding a new API key provider = add a YAML entry. That's it.
 
 ---
 
@@ -624,12 +642,20 @@ The OpenClaw agent reads this at startup and knows which external APIs it can ca
 2. Calls `connection-proxy:8081/github/user/repos`
 3. Gets the response as if it called GitHub directly
 
-If the user asks for something that requires a missing connection:
+If the user asks for something that requires a missing connection, the agent generates a deep link on the fly (see "Runtime Connection Requests" section):
+
 ```
 User: "Check my Slack messages"
-Agent: "I don't have access to Slack yet. You can connect it at
-        app.openclaw.cloud/dashboard/connections"
+
+Agent: "I don't have access to Slack yet. Connect it with one tap
+        and I'll be able to read your channels:
+
+        → https://app.openclaw.cloud/connect/slack?token=abc123
+
+        Once you're done, just ask me again!"
 ```
+
+The user taps the link in Telegram, authorizes Slack in their browser, and the agent picks up the new connection immediately on the next request. No pod restart, no dashboard navigation.
 
 ### System Prompt Addition
 
@@ -644,8 +670,13 @@ You have access to the following external services via your connection proxy:
 
 To call these services, make HTTP requests to the connection proxy URL.
 Authentication is handled automatically — do not add auth headers.
-If a user asks for something that requires a service you're not connected to,
-tell them to connect it at app.openclaw.cloud/dashboard/connections.
+
+If a user asks for something that requires a service you're not connected to:
+1. Call POST {connection_proxy_url}/internal/connect-link
+   with body: {"provider": "<provider_name>"}
+2. Include the returned URL in your response so the user can connect
+   with one tap directly from Telegram.
+3. Tell them to ask again once they've connected.
 ```
 
 ---
@@ -753,12 +784,146 @@ apps/api/openclaw_api/routes/
 
 ---
 
-## Open Questions
+## API Key Connections
 
-1. **Should we support API keys in addition to OAuth?** Some services (OpenAI, Anthropic, etc.) use static API keys. We could support a `secret_text` connection type where the customer pastes a key and we encrypt + proxy it the same way.
+Not all services use OAuth. Many powerful APIs (OpenAI, Anthropic, Stripe, Twilio, custom internal APIs) use static API keys. We support these as a `secret_text` connection type.
 
-2. **Should agents be able to request new connections at runtime?** e.g., user says "check my Linear issues" and the agent responds with a clickable link to connect Linear. This would require a WebSocket notification from agent → dashboard.
+### How It Works
 
-3. **Do we need per-connection rate limits from the provider side?** GitHub has 5000 req/h, Google has per-API quotas. Should the proxy enforce provider-side rate limits proactively, or just pass through 429s?
+Instead of an OAuth popup, the customer pastes their API key in the dashboard. The key is encrypted and stored identically to OAuth tokens — the agent never sees the raw key.
 
-4. **Multi-account per provider?** e.g., a user wants both personal GitHub and work GitHub connected. The current schema enforces one active connection per provider per customer. Worth supporting from day one?
+```
+1. Customer clicks "Add API Key" for a provider (e.g., "Custom API")
+2. Dashboard shows a form: name, base URL, API key, auth header format
+3. api encrypts the key (AES-256-GCM) and stores in connections table
+4. Agent calls connection-proxy the same way as OAuth connections
+5. Proxy injects the key as Authorization header (or custom header)
+```
+
+### Provider Config for API Key Services
+
+```yaml
+# In providers.yaml
+openai:
+  display_name: OpenAI
+  auth_mode: api_key
+  proxy_base_url: https://api.openai.com
+  auth_header: "Authorization"
+  auth_prefix: "Bearer "    # key is sent as "Bearer sk-..."
+
+custom:
+  display_name: Custom API
+  auth_mode: api_key
+  proxy_base_url: null       # customer provides the base URL
+  auth_header: "Authorization"
+  auth_prefix: "Bearer "
+```
+
+### Dashboard UI
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Add API Key Connection                                  │
+│                                                          │
+│  Name:      My Company Internal API                      │
+│  Base URL:  https://api.mycompany.com/v1                │
+│  API Key:   ●●●●●●●●●●●●●●●●●●●●●●  [paste]           │
+│  Auth Header: Authorization  (default)                   │
+│  Auth Format: Bearer {key}   (default)                   │
+│                                                          │
+│  [Connect]                                               │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Schema Addition
+
+The `connections` table already supports this — `auth_mode` is stored in the `provider` config, and `encrypted_data` holds `{"api_key": "sk-..."}` instead of OAuth tokens. No schema changes needed, just different proxy behavior (no refresh logic for API keys).
+
+---
+
+## Runtime Connection Requests (Deep Links)
+
+When an agent encounters a request that requires a service the customer hasn't connected, it doesn't just say "go to the dashboard" — it sends a **direct deep link** that starts the OAuth flow for that specific provider.
+
+### Flow
+
+```
+1. User (via Telegram): "check my Slack messages"
+
+2. Agent checks OPENCLAW_CONNECTIONS — no Slack connection.
+
+3. Agent responds:
+   "I don't have access to Slack yet. Connect it here and I'll
+    be able to read your channels:
+
+    → https://app.openclaw.cloud/connect/slack?token={short_lived_token}
+
+    Once you connect, just ask me again."
+
+4. User clicks the link on their phone → opens browser →
+   OAuth popup for Slack → authorizes → done.
+
+5. connection-proxy picks up the new connection immediately
+   (no pod restart needed — the proxy checks connections on
+   every request).
+
+6. User asks again: "check my Slack messages" → works.
+```
+
+### Deep Link Token
+
+The link contains a short-lived token (15min TTL, stored in Redis) that:
+- Identifies the customer (no login required if they're clicking from Telegram)
+- Specifies the provider to connect
+- Redirects back to a "success" page after OAuth completes
+
+```
+GET /connect/{provider}?token={connect_token}
+  → Validates connect_token (Redis lookup)
+  → Starts OAuth flow for that provider
+  → On success: shows "Connected! Go back to Telegram."
+  → On failure: shows error with retry option
+```
+
+### API Route
+
+```
+POST /internal/connect-link
+  body: { customer_id, provider }
+  → Generates a short-lived connect token
+  → Returns { url: "https://app.openclaw.cloud/connect/slack?token=abc123" }
+```
+
+The agent calls this internal route (via the connection-proxy) to generate the link on the fly.
+
+### Agent System Prompt Addition
+
+```
+If a user asks for something that requires a service you're not connected to,
+generate a connection link by calling:
+  POST http://connection-proxy.platform.svc.cluster.local:8081/internal/connect-link
+  body: {"provider": "slack"}
+
+Include the returned URL in your response so the user can connect with one tap.
+```
+
+This is a real differentiator — the agent actively helps the user expand its own capabilities. No need to explain "go to settings, find connections, click the button." One tap from Telegram and it's done.
+
+---
+
+## Rate Limiting
+
+Keep it simple: **pass through provider 429s**. The proxy does not try to predict or enforce provider-side rate limits. If GitHub returns 429, we pass it to the agent, and the agent tells the user "GitHub is rate-limiting us, try again in a minute."
+
+The only rate limiting we enforce ourselves is the per-customer, per-provider limit (60 req/min) to prevent runaway agent loops. This is purely a safety net, not a provider-aware system.
+
+---
+
+## Design Decisions
+
+| Question | Decision | Rationale |
+|---|---|---|
+| API keys in addition to OAuth? | **Yes** | Many useful services (OpenAI, internal APIs, Stripe) use static keys. Same proxy model, just skip the refresh logic. |
+| Runtime connection requests? | **Yes** | Key differentiator. Agent sends a deep link in Telegram — one tap to connect a new service. No dashboard navigation needed. |
+| Provider-side rate limits? | **Pass through 429s** | Simpler. Don't try to be smarter than the provider. Just enforce our own safety-net limit (60 req/min). |
+| Multi-account per provider? | **No, one connection per provider** | Keeps it simple. The current `UNIQUE (customer_id, provider)` constraint stays. Revisit if customers ask for it. |
