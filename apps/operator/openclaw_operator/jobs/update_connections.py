@@ -23,6 +23,10 @@ async def handle_update_connections(payload: dict, customer_id: str, db: AsyncSe
     connections_config = json.dumps({
         "nango_proxy_url": settings.nango_server_url,
         "nango_secret_key": settings.nango_secret_key,
+        "api_url": settings.api_url,
+        "api_secret": settings.agent_api_secret,
+        "customer_id": customer_id,
+        "web_url": settings.web_url,
         "connections": [
             {"provider": r.provider, "connection_id": r.nango_connection_id}
             for r in rows

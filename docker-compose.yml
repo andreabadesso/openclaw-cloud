@@ -41,6 +41,7 @@ services:
       NANGO_SERVER_URL: http://nango-server:8080
       NANGO_PUBLIC_URL: http://localhost:3003
       NANGO_SECRET_KEY: ${NANGO_SECRET_KEY:-7c999a69-a4f8-440a-b677-be2bee532fe3}
+      AGENT_API_SECRET: ${AGENT_API_SECRET:-dev-agent-secret}
       DEBUG: "true"
     depends_on:
       postgres:
@@ -78,6 +79,9 @@ services:
       INTERNAL_API_KEY: dev-internal-key
       NANGO_SERVER_URL: http://nango-server:8080
       NANGO_SECRET_KEY: ${NANGO_SECRET_KEY:-7c999a69-a4f8-440a-b677-be2bee532fe3}
+      AGENT_API_SECRET: ${AGENT_API_SECRET:-dev-agent-secret}
+      API_URL: http://api:8000
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
       KUBECONFIG: /root/.kube/config
     volumes:
       - /tmp/operator-kubeconfig.yaml:/root/.kube/config:ro

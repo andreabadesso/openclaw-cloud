@@ -41,17 +41,17 @@ Each customer gets a **dedicated Kubernetes namespace** with full isolation: res
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Control Plane                            │
 │                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌─────────────┐  ┌────────────┐  │
-│  │   Web    │  │   API    │  │  Operator   │  │Token Proxy │  │
-│  │ Next.js  │──│ FastAPI  │──│  (Python)   │  │  (FastAPI) │  │
-│  │  :3000   │  │  :8000   │  │             │  │   :8080    │  │
-│  └──────────┘  └────┬─────┘  └──────┬──────┘  └─────┬──────┘  │
-│                     │               │                │          │
-│              ┌──────┴──────┐   ┌────┴────┐          │          │
-│              │  PostgreSQL │   │  Redis  │          │          │
-│              │    :5432    │   │  :6379  │          │          │
-│              └─────────────┘   └─────────┘          │          │
-└─────────────────────────────────────────────────────┼──────────┘
+│  ┌────────┐ ┌────────┐ ┌──────────┐ ┌───────────┐ ┌───────────┐│
+│  │  Web   │ │  API   │ │ Operator │ │Token Proxy│ │   Nango   ││
+│  │Next.js │─│FastAPI │─│ (Python) │ │ (FastAPI) │ │  (OAuth)  ││
+│  │ :3000  │ │ :8000  │ │          │ │   :8080   │ │   :3003   ││
+│  └────────┘ └───┬────┘ └────┬─────┘ └─────┬─────┘ └─────┬─────┘│
+│                 │           │              │              │      │
+│          ┌──────┴──────┐ ┌──┴───┐         │              │      │
+│          │  PostgreSQL │ │Redis │         │              │      │
+│          │    :5432    │ │:6379 │         │              │      │
+│          └─────────────┘ └──────┘         │              │      │
+└───────────────────────────────────────────┼──────────────┼──────┘
                                                       │
 ┌─────────────────────────────────────────────────────┼──────────┐
 │                    K8s Cluster (K3s)                 │          │
@@ -80,10 +80,11 @@ Each customer gets a **dedicated Kubernetes namespace** with full isolation: res
 | Service | Tech | Purpose |
 |---|---|---|
 | **web** | Next.js 14, Tailwind, shadcn/ui | Landing page, admin panel, customer dashboard |
-| **api** | Python, FastAPI | REST API for auth, provisioning, box management |
+| **api** | Python, FastAPI | REST API for auth, provisioning, box management, agent connections |
 | **operator** | Python, kubernetes client | Watches Redis queue, manages K8s resources per customer |
 | **token-proxy** | Python, FastAPI | Proxies AI API calls with per-customer tokens, metering, rate limiting |
-| **postgres** | PostgreSQL 16 | Customers, subscriptions, boxes, usage, jobs |
+| **nango-server** | [Nango](https://nango.dev) (self-hosted) | OAuth proxy for 600+ external services (GitHub, Slack, etc.) |
+| **postgres** | PostgreSQL 16 | Customers, subscriptions, boxes, usage, jobs, connections |
 | **redis** | Redis 7 | Job queue (operator), rate limiting, caching |
 
 ### Key Design Decisions
@@ -91,6 +92,7 @@ Each customer gets a **dedicated Kubernetes namespace** with full isolation: res
 - **K8s pods per customer** (not VMs) — OpenClaw is lightweight (~512MB RAM). At ~50-100 pods per worker node, a small cluster handles hundreds of customers.
 - **Full Nix stack** — Single flake pins everything: NixOS nodes (Colmena), K8s manifests (kubenix), container images (nix2container). No drift.
 - **Token proxy pattern** — Customer pods never hold the real AI API key. All LLM traffic goes through the proxy with per-customer tokens, metering, and hard monthly limits.
+- **Nango for OAuth** — Self-hosted [Nango](https://nango.dev) handles OAuth flows, token refresh, and encrypted credential storage for 600+ external services. Agents call external APIs through the Nango proxy with automatic token management.
 - **Seconds to provision** — Creating a namespace + secret + deployment is near-instant vs. minutes for a VM.
 
 ---
@@ -180,6 +182,7 @@ open http://localhost:3000/admin
 | Web | http://localhost:3000 | Frontend (landing, admin, dashboard) |
 | API | http://localhost:8000 | REST API |
 | Token Proxy | http://localhost:8080 | AI API proxy |
+| Nango | http://localhost:3003 | OAuth admin dashboard |
 | PostgreSQL | localhost:5432 | Database |
 | Redis | localhost:6379 | Queue & cache |
 
@@ -242,7 +245,9 @@ openclaw-cloud/
 │   │       ├── routes/
 │   │       │   ├── internal.py   # /internal/provision, /suspend, /destroy, /boxes
 │   │       │   ├── boxes.py      # /me/box — customer-facing
-│   │       │   └── usage.py      # /me/usage
+│   │       │   ├── usage.py      # /me/usage
+│   │       │   └── connections.py# OAuth connections, agent API endpoints
+│   │       ├── nango_client.py   # Async httpx Nango API wrapper
 │   │       ├── models.py         # SQLAlchemy ORM models
 │   │       └── schemas.py        # Pydantic request/response schemas
 │   │
@@ -257,7 +262,8 @@ openclaw-cloud/
 │   │           ├── suspend.py    # Scale to 0
 │   │           ├── reactivate.py # Scale back to 1
 │   │           ├── resize.py     # Tier change
-│   │           └── update.py     # Config updates
+│   │           ├── update.py     # Config updates
+│   │           └── update_connections.py  # Sync connections to pod secret
 │   │
 │   ├── token-proxy/              # AI API metering proxy
 │   │   └── token_proxy/
@@ -299,7 +305,8 @@ openclaw-cloud/
 │
 ├── db/
 │   └── migrations/
-│       └── 001_initial.sql       # Full schema: 8 tables, 6 enums
+│       ├── 001_initial.sql       # Full schema: 8 tables, 6 enums
+│       └── 002_connections.sql   # customer_connections table + job type
 │
 └── docs/                         # Design documents
     ├── 00-overview.md
@@ -318,7 +325,7 @@ openclaw-cloud/
 
 ## Database Schema
 
-8 tables covering the full lifecycle:
+9 tables covering the full lifecycle:
 
 | Table | Purpose |
 |---|---|
@@ -330,6 +337,7 @@ openclaw-cloud/
 | `usage_events` | Individual API call logs |
 | `onboarding_sessions` | Conversational onboarding state machine |
 | `operator_jobs` | Async job queue with status tracking |
+| `customer_connections` | OAuth connections per customer (provider, Nango connection ID) |
 
 ---
 
@@ -382,6 +390,8 @@ result/bin/copy-to docker://ghcr.io/andreabadesso/openclaw-cloud/openclaw-gatewa
 - [x] K8s pod lifecycle (provision, suspend, reactivate, destroy)
 - [x] OpenClaw gateway container image (nix2container)
 - [x] Local dev environment (Docker Compose + k3d)
+- [x] Nango-powered OAuth connections (GitHub, Slack, Linear, Google, Notion, Jira)
+- [x] Agent connection discovery API + deep-link generation
 - [ ] JWT RS256 authentication
 - [ ] Stripe billing integration
 - [ ] Conversational onboarding agent (Kimi + LangChain)

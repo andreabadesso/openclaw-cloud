@@ -3,6 +3,7 @@ import secrets
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -245,6 +246,117 @@ async def create_connect_link(
 ):
     token = secrets.token_urlsafe(32)
     await r.set(f"connect-link:{token}", customer_id, ex=900)  # 15 min TTL
+    base = settings.cors_origins.split(",")[0]
+    url = f"{base}/connect/{body.provider}?token={token}"
+    return ConnectLinkResponse(url=url)
+
+
+class AgentConnectLinkRequest(BaseModel):
+    customer_id: str
+    provider: str
+
+
+ALL_PROVIDERS = ["github", "google", "slack", "linear", "notion", "jira"]
+
+PROVIDER_EXAMPLES: dict[str, dict] = {
+    "github": {
+        "name": "GitHub",
+        "example": "GET /proxy/user/repos",
+        "description": "GitHub API (repos, issues, PRs, code search)",
+    },
+    "slack": {
+        "name": "Slack",
+        "example": "POST /proxy/chat.postMessage with body {\"channel\":\"#general\",\"text\":\"Hello!\"}",
+        "description": "Slack API (messages, channels, users)",
+    },
+    "linear": {
+        "name": "Linear",
+        "example": "POST /proxy/graphql with body {\"query\":\"{ issues { nodes { title state { name } } } }\"}",
+        "description": "Linear API (issues, projects, cycles)",
+    },
+    "notion": {
+        "name": "Notion",
+        "example": "POST /proxy/v1/search with headers Notion-Version: 2022-06-28 and body {\"query\":\"\"}",
+        "description": "Notion API (pages, databases, blocks)",
+    },
+    "google": {
+        "name": "Google",
+        "example": "GET /proxy/calendar/v3/calendars/primary/events?maxResults=10",
+        "description": "Google API (calendar, drive, gmail)",
+    },
+    "jira": {
+        "name": "Jira",
+        "example": "GET /proxy/rest/api/3/search?jql=assignee=currentUser()",
+        "description": "Jira API (issues, projects, boards)",
+    },
+}
+
+
+def _verify_agent_secret(authorization: str) -> None:
+    expected = f"Bearer {settings.agent_api_secret}"
+    if not settings.agent_api_secret or authorization != expected:
+        raise HTTPException(status_code=401, detail="Invalid agent secret")
+
+
+@router.get("/internal/agent/connections")
+async def agent_get_connections(
+    authorization: str = Header(...),
+    x_customer_id: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return connection config for an agent. Authenticated via shared secret."""
+    _verify_agent_secret(authorization)
+
+    result = await db.execute(
+        select(CustomerConnection)
+        .where(CustomerConnection.customer_id == x_customer_id)
+        .where(CustomerConnection.status == "active")
+    )
+    rows = result.scalars().all()
+
+    connected_providers = {row.provider for row in rows}
+
+    connections = []
+    for row in rows:
+        conn_info = {
+            "provider": row.provider,
+            "connection_id": row.nango_connection_id,
+            "provider_config_key": row.provider,
+        }
+        if row.provider in PROVIDER_EXAMPLES:
+            conn_info["example"] = PROVIDER_EXAMPLES[row.provider]["example"]
+            conn_info["description"] = PROVIDER_EXAMPLES[row.provider]["description"]
+        connections.append(conn_info)
+
+    return {
+        "proxy_url": settings.nango_server_url,
+        "proxy_headers": {
+            "Connection-Id": "<connection_id>",
+            "Provider-Config-Key": "<provider>",
+            "Authorization": f"Bearer {settings.nango_secret_key}",
+        },
+        "connections": connections,
+        "available_providers": [
+            {
+                "provider": p,
+                **(PROVIDER_EXAMPLES.get(p, {})),
+            }
+            for p in ALL_PROVIDERS
+            if p not in connected_providers
+        ],
+    }
+
+
+@router.post("/internal/agent/connect-link", response_model=ConnectLinkResponse)
+async def agent_create_connect_link(
+    body: AgentConnectLinkRequest,
+    authorization: str = Header(...),
+    r: aioredis.Redis = Depends(get_redis),
+):
+    """Generate a deep-link URL for an agent to send to a user. Authenticated via shared secret."""
+    _verify_agent_secret(authorization)
+    token = secrets.token_urlsafe(32)
+    await r.set(f"connect-link:{token}", body.customer_id, ex=900)
     base = settings.cors_origins.split(",")[0]
     url = f"{base}/connect/{body.provider}?token={token}"
     return ConnectLinkResponse(url=url)

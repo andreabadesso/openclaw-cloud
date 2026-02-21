@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     nango_server_url: str = "http://nango-server:8080"
     nango_public_url: str = "http://localhost:3003"
     nango_secret_key: str = ""
+    agent_api_secret: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

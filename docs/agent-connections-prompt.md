@@ -3,8 +3,12 @@
 ## Overview
 
 When a customer has active connections, the OpenClaw gateway pod receives connection
-configuration via the `OPENCLAW_CONNECTIONS` environment variable. The gateway uses
-this to inject connection instructions into the agent's system prompt.
+configuration via the `OPENCLAW_CONNECTIONS` environment variable. The container
+entrypoint generates a static `AGENTS.md` in the workspace directory that instructs
+the agent to call the platform API at runtime to discover connections dynamically.
+
+This means connections can be added/removed without rebuilding the pod — the agent
+always gets fresh data by calling the API.
 
 ## OPENCLAW_CONNECTIONS Format
 
@@ -12,70 +16,76 @@ this to inject connection instructions into the agent's system prompt.
 {
     "nango_proxy_url": "http://nango-server.platform.svc.cluster.local:8080",
     "nango_secret_key": "nango-secret-key-here",
+    "api_url": "http://api.platform.svc.cluster.local:8000",
+    "api_secret": "shared-agent-secret",
+    "customer_id": "customer-uuid",
+    "web_url": "http://10.69.1.217:3000",
     "connections": [
         {
             "provider": "github",
             "connection_id": "customer-uuid_github"
-        },
-        {
-            "provider": "slack",
-            "connection_id": "customer-uuid_slack"
         }
     ]
 }
 ```
 
-## System Prompt Addition
+## Generated AGENTS.md
 
-Add to the agent's system prompt when connections are available:
+The entrypoint generates a **static** `AGENTS.md` that only contains:
+- The API URL, auth header, and customer ID
+- Instructions to call `GET /internal/agent/connections` to discover live connections
+- Instructions to call `POST /internal/agent/connect-link` to request new ones
 
+The agent fetches connection details at runtime, so they're always up to date.
+
+## API Endpoints
+
+### GET /internal/agent/connections
+
+Returns the current connection config for a customer. Authenticated via shared secret.
+
+**Headers:**
+- `Authorization: Bearer <AGENT_API_SECRET>`
+- `X-Customer-Id: <customer_id>`
+
+**Response:**
+```json
+{
+    "proxy_url": "http://nango-server.platform.svc.cluster.local:8080",
+    "proxy_headers": {
+        "Connection-Id": "<connection_id>",
+        "Provider-Config-Key": "<provider>",
+        "Authorization": "Bearer <nango_secret>"
+    },
+    "connections": [
+        {
+            "provider": "github",
+            "connection_id": "customer-uuid_github",
+            "provider_config_key": "github",
+            "example": "GET /proxy/user/repos",
+            "description": "GitHub API (repos, issues, PRs, code search)"
+        }
+    ],
+    "available_providers": [
+        {
+            "provider": "slack",
+            "name": "Slack",
+            "example": "POST /proxy/chat.postMessage with body {...}",
+            "description": "Slack API (messages, channels, users)"
+        }
+    ]
+}
 ```
-You have access to the following external service connections:
-{{#each connections}}
-- {{provider}}: Use the proxy to make API calls
-{{/each}}
 
-To call an external API, make HTTP requests to the Nango proxy:
+### POST /internal/agent/connect-link
 
-URL: {{nango_proxy_url}}/proxy/{{api_path}}
-Headers:
-  - Connection-Id: {{connection_id}}
-  - Provider-Config-Key: {{provider}}
-  - Authorization: Bearer {{nango_secret_key}}
+Generates a deep-link URL for OAuth. Authenticated via shared secret.
 
-Example — List GitHub repos:
-  GET http://nango-server.platform.svc.cluster.local:8080/proxy/user/repos
-  Headers:
-    Connection-Id: customer-uuid_github
-    Provider-Config-Key: github
-    Authorization: Bearer <nango_secret_key>
+**Headers:**
+- `Authorization: Bearer <AGENT_API_SECRET>`
+- `Content-Type: application/json`
 
-Example — Send Slack message:
-  POST http://nango-server.platform.svc.cluster.local:8080/proxy/chat.postMessage
-  Headers:
-    Connection-Id: customer-uuid_slack
-    Provider-Config-Key: slack
-    Authorization: Bearer <nango_secret_key>
-  Body: {"channel": "#general", "text": "Hello from OpenClaw!"}
-```
-
-## Connection ID Convention
-
-Format: `{customer_id}_{provider}`
-
-Example: `abc123-def456_github`
-
-## Requesting New Connections
-
-If the agent needs access to a service that isn't connected, it can generate a
-deep link for the user:
-
-```
-/connect/{provider}?token={short-lived-token}
-```
-
-The token is generated via `POST /internal/connect-link` with:
-
+**Request:**
 ```json
 {
     "customer_id": "...",
@@ -83,6 +93,26 @@ The token is generated via `POST /internal/connect-link` with:
 }
 ```
 
-This returns a URL that can be sent to the user via Telegram. The user opens the
-link in their browser, completes the OAuth flow, and the connection becomes
-available to the agent.
+**Response:**
+```json
+{
+    "url": "http://host:3000/connect/github?token=<short-lived-token>"
+}
+```
+
+The token expires after 15 minutes.
+
+## Connection ID Convention
+
+Format: `{customer_id}_{provider}`
+
+Example: `abc123-def456_github`
+
+## NetworkPolicy
+
+Customer pods are allowed egress to:
+- `token-proxy` (port 8080) — LLM API proxy
+- `nango-server` (port 8080) — Nango proxy for authenticated API calls
+- `api` (port 8000) — internal agent endpoint for connection discovery and deep-link generation
+- Public IPs (port 443) — Telegram API
+- CoreDNS (UDP 53) — DNS resolution
