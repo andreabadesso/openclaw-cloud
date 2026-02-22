@@ -33,7 +33,7 @@ def _make_row(provider: str, connection_id: str):
 class TestHandleUpdateConnections:
     @pytest.mark.asyncio
     async def test_happy_path_with_connections(self, mock_db, _patch_k8s, _patch_settings):
-        rows = [_make_row("github", "gh-conn-1"), _make_row("slack", "slack-conn-1")]
+        rows = [_make_row("github", "gh-conn-1"), _make_row("linear", "linear-conn-1")]
         result = MagicMock()
         result.fetchall.return_value = rows
         mock_db.execute.return_value = result
@@ -55,10 +55,20 @@ class TestHandleUpdateConnections:
         assert config["customer_id"] == "cust1"
         assert config["web_url"] == "http://localhost:3000"
         assert len(config["connections"]) == 2
-        assert config["connections"][0]["provider"] == "github"
-        assert config["connections"][0]["connection_id"] == "gh-conn-1"
-        assert config["connections"][0]["mcp"] is not None  # github has MCP_SERVERS entry
-        assert config["connections"][1]["provider"] == "slack"
+
+        # GitHub is a native provider — gets native_env, no mcp
+        gh_conn = config["connections"][0]
+        assert gh_conn["provider"] == "github"
+        assert gh_conn["connection_id"] == "gh-conn-1"
+        assert gh_conn["native_env"] == "GH_TOKEN"
+        assert "mcp" not in gh_conn
+
+        # Linear is an MCP provider — gets mcp config, no native_env
+        linear_conn = config["connections"][1]
+        assert linear_conn["provider"] == "linear"
+        assert linear_conn["connection_id"] == "linear-conn-1"
+        assert linear_conn["mcp"]["type"] == "http"
+        assert "native_env" not in linear_conn
 
         _patch_k8s["rollout_restart"].assert_called_once_with("cust1")
         _patch_k8s["wait_for_rollout"].assert_called_once()
@@ -76,7 +86,7 @@ class TestHandleUpdateConnections:
         assert config["connections"] == []
 
     @pytest.mark.asyncio
-    async def test_provider_without_mcp_server(self, mock_db, _patch_k8s, _patch_settings):
+    async def test_unknown_provider_has_no_mcp_or_native(self, mock_db, _patch_k8s, _patch_settings):
         rows = [_make_row("unknown-provider", "conn-1")]
         result = MagicMock()
         result.fetchall.return_value = rows
@@ -86,7 +96,9 @@ class TestHandleUpdateConnections:
 
         call_args = _patch_k8s["patch_config_secret"].call_args
         config = json.loads(call_args[0][1]["OPENCLAW_CONNECTIONS"])
-        assert config["connections"][0]["mcp"] is None
+        conn = config["connections"][0]
+        assert "mcp" not in conn
+        assert "native_env" not in conn
 
     @pytest.mark.asyncio
     async def test_rollout_timeout_raises(self, mock_db, _patch_settings):
@@ -103,13 +115,57 @@ class TestHandleUpdateConnections:
                 await handle_update_connections({}, "cust1", mock_db)
 
     @pytest.mark.asyncio
-    async def test_mcp_config_for_known_providers(self, mock_db, _patch_k8s, _patch_settings):
-        """Verify MCP server configs are included for all known providers."""
+    async def test_native_providers_get_native_env(self, mock_db, _patch_k8s, _patch_settings):
+        """GitHub, Notion, Slack are native — they get native_env, not mcp."""
         rows = [
             _make_row("github", "c1"),
-            _make_row("linear", "c2"),
-            _make_row("notion", "c3"),
-            _make_row("slack", "c4"),
+            _make_row("notion", "c2"),
+            _make_row("slack", "c3"),
+        ]
+        result = MagicMock()
+        result.fetchall.return_value = rows
+        mock_db.execute.return_value = result
+
+        await handle_update_connections({}, "cust1", mock_db)
+
+        call_args = _patch_k8s["patch_config_secret"].call_args
+        config = json.loads(call_args[0][1]["OPENCLAW_CONNECTIONS"])
+
+        expected = {"github": "GH_TOKEN", "notion": "NOTION_API_KEY", "slack": "SLACK_BOT_TOKEN"}
+        for conn in config["connections"]:
+            assert conn["native_env"] == expected[conn["provider"]]
+            assert "mcp" not in conn
+
+    @pytest.mark.asyncio
+    async def test_mcp_providers_get_mcp_config(self, mock_db, _patch_k8s, _patch_settings):
+        """Linear, Jira, Google are MCP — they get mcp config, not native_env."""
+        rows = [
+            _make_row("linear", "c1"),
+            _make_row("jira", "c2"),
+            _make_row("google", "c3"),
+        ]
+        result = MagicMock()
+        result.fetchall.return_value = rows
+        mock_db.execute.return_value = result
+
+        await handle_update_connections({}, "cust1", mock_db)
+
+        call_args = _patch_k8s["patch_config_secret"].call_args
+        config = json.loads(call_args[0][1]["OPENCLAW_CONNECTIONS"])
+
+        for conn in config["connections"]:
+            assert "mcp" in conn
+            assert conn["mcp"] is not None
+            assert "native_env" not in conn
+
+    @pytest.mark.asyncio
+    async def test_all_six_providers(self, mock_db, _patch_k8s, _patch_settings):
+        """All 6 supported providers are categorized correctly."""
+        rows = [
+            _make_row("github", "c1"),
+            _make_row("notion", "c2"),
+            _make_row("slack", "c3"),
+            _make_row("linear", "c4"),
             _make_row("jira", "c5"),
             _make_row("google", "c6"),
         ]
@@ -121,5 +177,9 @@ class TestHandleUpdateConnections:
 
         call_args = _patch_k8s["patch_config_secret"].call_args
         config = json.loads(call_args[0][1]["OPENCLAW_CONNECTIONS"])
-        for conn in config["connections"]:
-            assert conn["mcp"] is not None, f"Expected MCP config for {conn['provider']}"
+        assert len(config["connections"]) == 6
+
+        native_conns = [c for c in config["connections"] if "native_env" in c]
+        mcp_conns = [c for c in config["connections"] if "mcp" in c]
+        assert len(native_conns) == 3  # github, notion, slack
+        assert len(mcp_conns) == 3  # linear, jira, google

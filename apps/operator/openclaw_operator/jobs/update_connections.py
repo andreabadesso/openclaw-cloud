@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..k8s import patch_config_secret, rollout_restart, wait_for_rollout
-from ..providers import MCP_SERVERS
+from ..providers import MCP_SERVERS, NATIVE_PROVIDERS
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,18 @@ async def handle_update_connections(payload: dict, customer_id: str, db: AsyncSe
     )
     rows = result.fetchall()
 
+    connections = []
+    for r in rows:
+        conn = {
+            "provider": r.provider,
+            "connection_id": r.nango_connection_id,
+        }
+        if r.provider in NATIVE_PROVIDERS:
+            conn["native_env"] = NATIVE_PROVIDERS[r.provider]
+        elif r.provider in MCP_SERVERS:
+            conn["mcp"] = MCP_SERVERS[r.provider]
+        connections.append(conn)
+
     connections_config = json.dumps({
         "nango_proxy_url": settings.nango_server_url,
         "nango_secret_key": settings.nango_secret_key,
@@ -28,14 +40,7 @@ async def handle_update_connections(payload: dict, customer_id: str, db: AsyncSe
         "api_secret": settings.agent_api_secret,
         "customer_id": customer_id,
         "web_url": settings.web_url,
-        "connections": [
-            {
-                "provider": r.provider,
-                "connection_id": r.nango_connection_id,
-                "mcp": MCP_SERVERS.get(r.provider),
-            }
-            for r in rows
-        ],
+        "connections": connections,
     })
 
     patch_config_secret(customer_id, {"OPENCLAW_CONNECTIONS": connections_config})

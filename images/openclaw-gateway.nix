@@ -42,20 +42,15 @@ let
       NANGO_PROXY_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_proxy_url')
       NANGO_SECRET_KEY=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_secret_key')
 
-      # Build mcporter.json by fetching fresh tokens from Nango for each connection
+      # Process connections: native providers get env vars, MCP providers get mcporter config
       MCPORTER_SERVERS="{}"
       CONNECTED_LIST=""
 
       for row in $(printf '%s' "$CONNECTIONS_JSON" | jq -c '.connections[]'); do
         CONN_PROVIDER=$(printf '%s' "$row" | jq -r '.provider')
         CONN_ID=$(printf '%s' "$row" | jq -r '.connection_id')
+        NATIVE_ENV=$(printf '%s' "$row" | jq -r '.native_env // empty')
         MCP_META=$(printf '%s' "$row" | jq -c '.mcp // empty')
-
-        if [ -z "$MCP_META" ]; then
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER** (no MCP server configured — use curl via Nango proxy)"
-          continue
-        fi
 
         # Fetch fresh token from Nango
         TOKEN_RESP=$(curl -sf "$NANGO_PROXY_URL/connection/$CONN_ID?provider_config_key=$CONN_PROVIDER" \
@@ -64,7 +59,22 @@ let
 
         if [ -z "$ACCESS_TOKEN" ]; then
           CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER** (token fetch failed — use curl via Nango proxy)"
+- **$CONN_PROVIDER** (token fetch failed)"
+          continue
+        fi
+
+        # --- Native provider: inject as env var for openclaw's built-in tools ---
+        if [ -n "$NATIVE_ENV" ]; then
+          export "$NATIVE_ENV=$ACCESS_TOKEN"
+          CONNECTED_LIST="$CONNECTED_LIST
+- **$CONN_PROVIDER**: native openclaw integration (use built-in tools)"
+          continue
+        fi
+
+        # --- MCP provider: build mcporter config ---
+        if [ -z "$MCP_META" ]; then
+          CONNECTED_LIST="$CONNECTED_LIST
+- **$CONN_PROVIDER** (no integration configured)"
           continue
         fi
 
@@ -93,26 +103,34 @@ let
 - **$CONN_PROVIDER**: \`mcporter call $CONN_PROVIDER.<tool> <args>\`"
       done
 
-      # Write mcporter config
-      mkdir -p /root/.mcporter
-      printf '%s' "{\"mcpServers\": $MCPORTER_SERVERS, \"imports\": []}" > /root/.mcporter/mcporter.json
-
-      # Pre-cache mcporter
-      npx mcporter@latest --version >/dev/null 2>&1 || true
+      # Write mcporter config (only if there are MCP servers)
+      if [ "$MCPORTER_SERVERS" != "{}" ]; then
+        mkdir -p /root/.mcporter
+        printf '%s' "{\"mcpServers\": $MCPORTER_SERVERS, \"imports\": []}" > /root/.mcporter/mcporter.json
+        npx mcporter@latest --version >/dev/null 2>&1 || true
+      fi
 
       cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
 # External Service Connections
 
-You have access to external services via MCP tools. Use the \`exec\` tool to call them with \`mcporter\`.
-
-**IMPORTANT**: Always use \`exec\` with \`mcporter\` — the \`web_fetch\` tool does NOT support custom headers.
+You have access to external services through native openclaw tools and MCP servers.
 
 ## Connected Services
 $CONNECTED_LIST
 
-## How to Use
+## Native Integrations (GitHub, Notion, Slack)
 
-List available tools for a service:
+These work through openclaw's built-in tools and skills — no special commands needed.
+
+- **GitHub**: Use the \`github\` skill (\`gh\` CLI). Examples: \`gh issue list\`, \`gh pr create\`, \`gh repo view\`
+- **Notion**: Use the \`notion\` skill. Examples: search pages, read databases, create pages
+- **Slack**: Use the built-in Slack actions tool for messaging, reactions, and channel management
+
+## MCP Integrations (Linear, Jira, Google)
+
+These require \`mcporter\` via the \`exec\` tool.
+
+List available tools:
 \`\`\`
 mcporter list <server> --schema
 \`\`\`
@@ -129,15 +147,8 @@ mcporter call <server>.<tool> <args> --output json
 mcporter call linear.list_issues --output json
 mcporter call linear.get_issue id:ENG-123 --output json
 
-# GitHub
-mcporter call github.search_repos query:"openclaw language:typescript" --output json
-mcporter call github.list_pull_requests owner:myorg repo:myrepo --output json
-
-# Notion
-mcporter call notion.search query:"meeting notes" --output json
-
-# Slack
-mcporter call slack.post_message channel:"#general" text:"Hello from OpenClaw" --output json
+# Jira
+mcporter call jira.search_issues jql:"project = PROJ" --output json
 
 # Google Drive
 mcporter call google.search_files query:"quarterly report" --output json
