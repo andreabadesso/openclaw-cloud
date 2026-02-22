@@ -2,7 +2,7 @@
 
 **Your AI agent. Zero setup. One Telegram chat away.**
 
-A managed platform that gives every customer their own personal AI agent — fully isolated in a Kubernetes pod, accessible via Telegram, provisioned in seconds. Agents connect to external services (GitHub, Linear, Slack, Google Drive, Notion, Jira) through OAuth with automatic token refresh, and interact with them using structured MCP tools instead of raw API calls.
+A managed platform that gives every customer their own personal AI agent — fully isolated in a Kubernetes pod, accessible via Telegram, provisioned in seconds. Agents connect to external services (GitHub, Linear, Slack, Google Drive, Notion, Jira) through OAuth with automatic token refresh. Native integrations use openclaw's built-in tools; others are accessed via structured MCP servers through mcporter.
 
 ---
 
@@ -29,6 +29,7 @@ graph TB
       api["API<br/><small>FastAPI</small>"]
       operator["Operator"]
       proxy["Token Proxy"]
+      billing["Billing Worker"]
       nango["Nango<br/><small>OAuth</small>"]
       pg[("Postgres")]
       redis[("Redis")]
@@ -37,6 +38,8 @@ graph TB
       api --> pg
       api --> redis
       operator --> redis
+      billing --> redis
+      billing --> pg
       proxy --> pg
     end
 
@@ -49,11 +52,13 @@ graph TB
     end
 
     gw1 -- "LLM calls<br/>(proxied)" --> proxy
+    gw1 -- "native tools<br/>(env vars)" --> nango
     gw1 -- "MCP tools<br/>(mcporter)" --> nango
     operator -- "provisions" --> c1
     operator -- "provisions" --> c2
   end
 
+  billing -- "webhooks" --- stripe(("Stripe"))
   proxy -- "Kimi API" --> moonshot(("Moonshot"))
   nango -- "OAuth tokens" --> providers(("GitHub, Linear,<br/>Slack, Google, ..."))
 ```
@@ -62,9 +67,10 @@ graph TB
 
 | Service | Stack | Role |
 |---|---|---|
-| **api** | FastAPI + SQLAlchemy | REST API — auth, provisioning, connections, usage tracking |
+| **api** | FastAPI + SQLAlchemy | REST API — auth, provisioning, connections, billing portal, usage tracking |
 | **operator** | Python + Redis BLPOP | Job queue consumer — creates/manages K8s resources per customer |
-| **token-proxy** | Node.js | Transparent LLM proxy — per-customer auth, rate limits, token quotas, usage metering |
+| **billing-worker** | FastAPI + Stripe | Stripe webhook processor — handles checkout, payments, tier changes, cancellations |
+| **token-proxy** | Node.js + pi-ai | Transparent LLM proxy — per-customer auth, rate limits, token quotas, usage metering |
 | **web** | Next.js 14 + Tailwind + shadcn/ui | Landing page, onboarding, customer dashboard, OAuth flows, admin panel |
 | **nango-server** | Nango (self-hosted) | OAuth lifecycle — token storage, automatic refresh, encrypted credentials, proxy |
 | **postgres** | PostgreSQL | All persistent data |
@@ -74,16 +80,20 @@ graph TB
 
 Every customer gets their own K8s namespace containing:
 
-- **openclaw-gateway** pod — the AI agent (Telegram bot + LLM + MCP tools)
+- **openclaw-gateway** pod — the AI agent (Telegram bot + LLM + native tools + MCP tools)
 - **openclaw-config** Secret — bot token, proxy API key, model config, connection credentials
 - **ResourceQuota** — CPU/memory limits enforced per tier
 - **NetworkPolicy** — egress restricted to token-proxy, nango-server, and Telegram only
 
 ## External service integrations
 
-Agents access external services through [MCP](https://modelcontextprotocol.io) (Model Context Protocol) servers via [mcporter](https://github.com/steipete/mcporter). Instead of crafting raw API calls, the agent uses structured tools like `mcporter call linear.list_issues` or `mcporter call github.search_repos`.
+Agents access external services through two mechanisms, depending on the provider:
 
-OAuth is handled by a self-hosted [Nango](https://nango.dev) instance. Tokens are fetched fresh from Nango at pod startup and injected into the mcporter config — no tokens stored on disk, automatic refresh on every restart.
+**Native integrations** — GitHub, Notion, Slack use openclaw's built-in tools and skills. OAuth tokens from Nango are injected as environment variables (`GH_TOKEN`, `NOTION_API_KEY`, `SLACK_BOT_TOKEN`) at pod startup. The agent uses these automatically with no extra configuration.
+
+**MCP integrations** — Linear, Jira, Google use [MCP](https://modelcontextprotocol.io) servers via [mcporter](https://github.com/steipete/mcporter). The agent uses structured tool calls like `mcporter call linear.list_issues` instead of raw API requests.
+
+OAuth for all providers is handled by a self-hosted [Nango](https://nango.dev) instance. Tokens are fetched fresh at pod startup — no tokens stored on disk, automatic refresh on every restart.
 
 ```mermaid
 sequenceDiagram
@@ -105,7 +115,7 @@ sequenceDiagram
   API->>Operator: Enqueue update_connections job
   Operator->>Agent: Patch secret + restart pod
 
-  Note over Agent: Startup: fetch fresh tokens<br/>from Nango, write mcporter.json
+  Note over Agent: Startup: fetch tokens from Nango,<br/>export env vars (native) or<br/>write mcporter.json (MCP)
 
   User->>Agent: "List my Linear issues"
   Agent->>Agent: exec mcporter call linear.list_issues
@@ -115,16 +125,16 @@ sequenceDiagram
 
 ### Supported providers
 
-| Provider | MCP Server | Tools |
+| Provider | Type | How it works |
 |---|---|---|
-| **Linear** | `mcp.linear.app/sse` (hosted) | Issues, projects, cycles, comments |
-| **GitHub** | `@anthropic/github-mcp-server` | Repos, issues, PRs, code search |
-| **Notion** | `@notionhq/notion-mcp-server` | Pages, databases, blocks, search |
-| **Slack** | `@anthropic/slack-mcp-server` | Messages, channels, users |
-| **Jira** | `mcp-atlassian` | Issues, projects, boards |
-| **Google** | `@anthropic/google-drive-mcp` | Drive, Sheets, Calendar |
+| **GitHub** | Native | `GH_TOKEN` env var → openclaw's built-in `gh` CLI skill |
+| **Notion** | Native | `NOTION_API_KEY` env var → openclaw's built-in Notion skill |
+| **Slack** | Native | `SLACK_BOT_TOKEN` env var → openclaw's built-in Slack actions |
+| **Linear** | MCP | `mcp.linear.app/sse` (hosted HTTP) via mcporter |
+| **Jira** | MCP | `mcp-atlassian` (stdio) via mcporter |
+| **Google** | MCP | `@anthropic/google-drive-mcp` (stdio) via mcporter |
 
-600+ more providers available through Nango. Adding a new one requires only a Nango integration config and an MCP server entry in `providers.py`.
+600+ more providers available through Nango. Adding a new native provider requires an env var mapping in `providers.py`. Adding a new MCP provider requires an MCP server entry in `providers.py`.
 
 ### Runtime connection requests
 
@@ -139,6 +149,18 @@ Customer pods never hold real LLM API keys. All inference calls go through the t
 - Checks monthly token quotas before forwarding
 - Proxies to the upstream LLM provider (Moonshot/Kimi)
 - Meters usage per-request (Redis stream → batch Postgres writes)
+
+## Billing
+
+Stripe handles all payment processing. The billing flow is fully automated:
+
+1. **Checkout** → `billing-worker` receives `checkout.session.completed` → creates subscription → enqueues provision job
+2. **Monthly renewal** → `invoice.payment_succeeded` → resets token counter, reactivates if suspended
+3. **Payment failure** → `invoice.payment_failed` → suspends pod after 3 failed attempts
+4. **Tier change** → `customer.subscription.updated` → enqueues resize job (adjusts quotas + resources)
+5. **Cancellation** → `customer.subscription.deleted` → enqueues destroy job
+
+Customers manage invoices and payment methods through the Stripe billing portal (`POST /billing/portal-session`).
 
 ## Pricing tiers
 
@@ -161,10 +183,30 @@ Customer pods never hold real LLM API keys. All inference calls go through the t
 | **API** | FastAPI + SQLAlchemy (async) + Pydantic |
 | **Frontend** | Next.js 14 + Tailwind CSS + shadcn/ui |
 | **LLM proxy** | Node.js + pi-ai (provider abstraction) |
+| **Billing** | Stripe (webhooks → billing-worker) |
 | **OAuth** | Nango (self-hosted) |
-| **MCP tooling** | mcporter + per-provider MCP servers |
+| **MCP tooling** | mcporter (Linear, Jira, Google) + native openclaw tools (GitHub, Notion, Slack) |
 | **AI model** | Kimi Code (kimi-coding/k2p5) via Moonshot API |
+| **CI/CD** | GitHub Actions (tests + Docker builds) |
 | **Cloud** | Hetzner Cloud + ghcr.io |
+
+## Testing
+
+242 tests across all services, run in CI on every push:
+
+```bash
+# API (68 tests) — SQLite in-memory, full route coverage
+cd apps/api && pip install -e ".[test]" && pytest
+
+# Operator (85 tests) — mocked K8s + Redis, all job handlers
+cd apps/operator && pip install -e ".[test]" && pytest
+
+# Billing Worker (23 tests) — mocked Stripe events, all webhook handlers
+cd apps/billing-worker && pip install -e ".[dev]" && pytest
+
+# Token Proxy (66 tests) — streaming + non-streaming proxy, context conversion
+cd apps/token-proxy && npm ci && npm test
+```
 
 ## Local development
 
@@ -229,6 +271,7 @@ curl -X POST http://localhost:8000/internal/provision \
 apps/
   api/                  # FastAPI — REST API
   operator/             # Python — K8s resource manager (Redis job queue)
+  billing-worker/       # FastAPI — Stripe webhook processor
   token-proxy/          # Node.js — LLM proxy with auth + metering
   web/                  # Next.js — frontend
 images/
@@ -242,6 +285,8 @@ scripts/                # dev-setup.sh, dev-import.sh
 db/
   migrations/           # SQL migrations
 docs/                   # Technical design documents
+.github/
+  workflows/ci.yml      # Tests + Docker builds on push/PR
 ```
 
 ## Roadmap
@@ -249,10 +294,12 @@ docs/                   # Technical design documents
 - [x] Core platform (API, operator, token proxy, web)
 - [x] K8s pod lifecycle (provision, suspend, reactivate, destroy, resize)
 - [x] Nango OAuth integrations (6 providers)
-- [x] MCP tool access via mcporter (replaces raw curl)
+- [x] Native tool access for GitHub, Notion, Slack (env var injection)
+- [x] MCP tool access via mcporter for Linear, Jira, Google
+- [x] Stripe billing integration (billing-worker + webhook handlers)
+- [x] CI pipeline (GitHub Actions — tests + Docker builds)
 - [x] All services in-cluster (k3d local, K3s prod)
 - [ ] JWT RS256 authentication
-- [ ] Stripe billing integration
 - [ ] Conversational onboarding agent
 - [ ] Health monitoring + auto-restart
 - [ ] Production deployment (Hetzner)
