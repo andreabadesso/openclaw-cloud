@@ -27,6 +27,8 @@ from openclaw_api.schemas import (
     JobEnqueuedResponse,
     ProvisionRequest,
     ProvisionResponse,
+    ResizeRequest,
+    UpdateBoxRequest,
 )
 
 TIER_TOKEN_LIMITS = {
@@ -218,6 +220,103 @@ async def reactivate_box(
     await enqueue_job(
         r, job_id=job.id, job_type="reactivate",
         customer_id=box.customer_id, box_id=box.id,
+    )
+
+    return JobEnqueuedResponse(job_id=job.id, box_id=box.id)
+
+
+@router.patch("/update/{box_id}", response_model=JobEnqueuedResponse)
+async def update_box(
+    box_id: str,
+    body: UpdateBoxRequest,
+    db: AsyncSession = Depends(get_db),
+    r: aioredis.Redis = Depends(get_redis),
+):
+    result = await db.execute(select(Box).where(Box.id == box_id))
+    box = result.scalar_one_or_none()
+    if not box:
+        raise HTTPException(status_code=404, detail="Box not found")
+    if box.status not in (BoxStatus.active, BoxStatus.updating):
+        raise HTTPException(status_code=409, detail=f"Box must be active to update, current status: {box.status}")
+
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    secret_data = {}
+    if body.telegram_user_ids is not None:
+        secret_data["TELEGRAM_ALLOW_FROM"] = ",".join(str(uid) for uid in body.telegram_user_ids)
+    if body.model is not None:
+        secret_data["OPENCLAW_MODEL"] = body.model
+    if body.thinking_level is not None:
+        secret_data["OPENCLAW_THINKING"] = body.thinking_level
+
+    for key, value in updates.items():
+        setattr(box, key, value)
+
+    job = OperatorJob(
+        customer_id=box.customer_id,
+        box_id=box.id,
+        job_type=JobType.update,
+        status=JobStatus.queued,
+        payload={"box_id": box.id, "secret_data": secret_data},
+    )
+    db.add(job)
+    box.status = BoxStatus.updating
+    await db.commit()
+    await db.refresh(job)
+
+    await enqueue_job(
+        r, job_id=job.id, job_type="update",
+        customer_id=box.customer_id, box_id=box.id,
+        payload={"box_id": box.id, "secret_data": secret_data},
+    )
+
+    return JobEnqueuedResponse(job_id=job.id, box_id=box.id)
+
+
+@router.post("/resize/{box_id}", response_model=JobEnqueuedResponse)
+async def resize_box(
+    box_id: str,
+    body: ResizeRequest,
+    db: AsyncSession = Depends(get_db),
+    r: aioredis.Redis = Depends(get_redis),
+):
+    result = await db.execute(select(Box).where(Box.id == box_id))
+    box = result.scalar_one_or_none()
+    if not box:
+        raise HTTPException(status_code=404, detail="Box not found")
+    if box.status not in (BoxStatus.active, BoxStatus.updating):
+        raise HTTPException(status_code=409, detail=f"Box must be active to resize, current status: {box.status}")
+
+    # Look up current subscription tier
+    sub_result = await db.execute(
+        select(Subscription).where(Subscription.id == box.subscription_id)
+    )
+    subscription = sub_result.scalar_one_or_none()
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    if subscription.tier.value == body.new_tier:
+        raise HTTPException(status_code=409, detail="Box is already on this tier")
+
+    subscription.tier = Tier(body.new_tier)
+    subscription.tokens_limit = TIER_TOKEN_LIMITS[body.new_tier]
+
+    job = OperatorJob(
+        customer_id=box.customer_id,
+        box_id=box.id,
+        job_type=JobType.resize,
+        status=JobStatus.queued,
+        payload={"box_id": box.id, "new_tier": body.new_tier},
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    await enqueue_job(
+        r, job_id=job.id, job_type="resize",
+        customer_id=box.customer_id, box_id=box.id,
+        payload={"box_id": box.id, "new_tier": body.new_tier},
     )
 
     return JobEnqueuedResponse(job_id=job.id, box_id=box.id)

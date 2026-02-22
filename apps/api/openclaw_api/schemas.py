@@ -102,6 +102,14 @@ class ConnectSessionResponse(BaseModel):
     connect_url: str
 
 
+class ResizeRequest(BaseModel):
+    new_tier: str = Field(pattern=r"^(starter|pro|team)$")
+
+
+class BillingPortalResponse(BaseModel):
+    url: str
+
+
 class ConnectLinkRequest(BaseModel):
     provider: str
 

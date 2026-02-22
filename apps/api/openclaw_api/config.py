@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     nango_public_url: str = "http://localhost:3003"
     nango_secret_key: str = ""
     agent_api_secret: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
