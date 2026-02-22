@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [model, setModel] = useState(defaultModel);
   const [thinkingLevel, setThinkingLevel] = useState("medium");
   const [language, setLanguage] = useState("en");
+  const [niche, setNiche] = useState<string>("");
 
   const fetchBoxes = () => {
     api
@@ -52,6 +53,7 @@ export default function AdminPage() {
         model,
         thinking_level: thinkingLevel,
         language,
+        niche: niche || undefined,
       });
       setMessage({ type: "success", text: "Instance provisioned successfully." });
       setCustomerEmail("");
@@ -61,6 +63,7 @@ export default function AdminPage() {
       setModel(defaultModel);
       setThinkingLevel("medium");
       setLanguage("en");
+      setNiche("");
       fetchBoxes();
     } catch (err) {
       setMessage({
@@ -184,6 +187,21 @@ export default function AdminPage() {
           </div>
 
           <div>
+            <label htmlFor="niche" className={labelClass}>
+              Niche
+            </label>
+            <select
+              id="niche"
+              value={niche}
+              onChange={(e) => setNiche(e.target.value)}
+              className={selectClass}
+            >
+              <option value="">None (generic agent)</option>
+              <option value="pharmacy">Pharmacy (Farmacia)</option>
+            </select>
+          </div>
+
+          <div>
             <label htmlFor="model" className={labelClass}>
               Model
             </label>
@@ -254,6 +272,7 @@ export default function AdminPage() {
                   <th className="pb-2 pr-4 font-medium">Namespace</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
                   <th className="pb-2 pr-4 font-medium">Model</th>
+                  <th className="pb-2 pr-4 font-medium">Niche</th>
                   <th className="pb-2 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -268,6 +287,7 @@ export default function AdminPage() {
                       <StatusBadge status={b.status} />
                     </td>
                     <td className="py-3 pr-4">{b.model}</td>
+                    <td className="py-3 pr-4">{b.niche ?? "-"}</td>
                     <td className="py-3">
                       <div className="flex gap-2">
                         {b.status === "active" && (

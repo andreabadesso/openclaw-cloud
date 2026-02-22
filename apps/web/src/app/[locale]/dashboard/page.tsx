@@ -43,7 +43,6 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="text-2xl font-bold">Dashboard</h1>
 
-      {/* Status Card */}
       <div className="mt-8 rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Box Status</h2>
@@ -54,13 +53,11 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Token Usage */}
       <div className="mt-6 rounded-lg border bg-card p-6">
         <h2 className="mb-4 font-semibold">Token Usage</h2>
         <UsageGauge used={box.tokens_used} limit={box.tokens_limit} />
       </div>
 
-      {/* Config */}
       <div className="mt-6 rounded-lg border bg-card p-6">
         <h2 className="mb-4 font-semibold">Configuration</h2>
         <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -91,7 +88,6 @@ export default function DashboardPage() {
         </dl>
       </div>
 
-      {/* Billing */}
       <div className="mt-6">
         <a
           href="/billing"

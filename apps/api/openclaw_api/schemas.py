@@ -10,6 +10,7 @@ class BoxResponse(BaseModel):
     model: str
     thinking_level: str
     language: str
+    niche: str | None = None
     telegram_user_ids: list[int]
     created_at: datetime
     activated_at: datetime | None = None
@@ -33,6 +34,7 @@ class ProvisionRequest(BaseModel):
     thinking_level: str = "medium"
     language: str = "en"
     customer_email: str
+    niche: str | None = None
 
 
 class UpdateBoxRequest(BaseModel):
@@ -50,6 +52,7 @@ class BoxListItem(BaseModel):
     model: str
     thinking_level: str
     language: str
+    niche: str | None = None
     telegram_user_ids: list[int]
     created_at: datetime
     activated_at: datetime | None = None

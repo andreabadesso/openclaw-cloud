@@ -1,23 +1,44 @@
 # openclaw-cloud
 
-**Your AI agent. Zero setup. One Telegram chat away.**
+**Agentes de IA especializados. Para o seu nicho.**
 
-A managed platform that gives every customer their own personal AI agent — fully isolated in a Kubernetes pod, accessible via Telegram, provisioned in seconds. Agents connect to external services (GitHub, Linear, Slack, Google Drive, Notion, Jira) through OAuth with automatic token refresh. Native integrations use openclaw's built-in tools; others are accessed via structured MCP servers through mcporter.
+A managed platform that gives every customer a **niche-specific AI agent** — fully isolated in a Kubernetes pod, accessible via Telegram, provisioned in seconds. Choose a specialized agent for your industry (pharmacy, legal, real estate, accounting), connect your apps via OAuth, and start working immediately.
+
+The first vertical is **Pharmacy (Farmacia)** — a Portuguese-speaking assistant trained on pharmaceutical knowledge, helping with drug interaction lookups, inventory management, customer service, and management system integration.
 
 ---
 
 ## How it works
 
 ```
-Chat → Pay → Code
+Escolha → Assine → Use
 ```
 
-1. Customer talks to the onboarding agent — no forms, no config files
+1. Customer picks a niche agent from the marketplace (or gets recommended one during onboarding)
 2. Picks a plan, checks out with Stripe in 30 seconds
-3. A dedicated [OpenClaw](https://openclaw.ai) gateway pod spins up on Kubernetes
-4. Their Telegram bot goes live — a personal AI coding agent, ready to go
+3. A dedicated [OpenClaw](https://openclaw.ai) gateway pod spins up on Kubernetes with the niche-specific system prompt
+4. Their Telegram bot goes live — a specialized AI agent, ready to go
 
 Each customer gets full isolation: own K8s namespace, resource quotas, network policies. Customer pods never hold real API keys — LLM calls route through a token proxy with per-customer metering and rate limits.
+
+## Niches
+
+| Niche | Status | Agent Focus |
+|---|---|---|
+| **Farmacia** 💊 | Active | Drug interactions, inventory, customer service, management systems |
+| **Juridico** ⚖️ | Coming soon | Case law, legal drafting, deadline management |
+| **Imobiliario** 🏠 | Coming soon | Leads, property listings, market analysis |
+| **Contabilidade** 📊 | Coming soon | Entry classification, bank reconciliation, tax obligations |
+
+Each niche defines a specialized system prompt injected into the agent pod as `OPENCLAW_SYSTEM_PROMPT`. The agent uses this prompt to tailor its behavior, language, and domain knowledge.
+
+## i18n
+
+The web frontend uses [next-intl](https://next-intl.dev) with Portuguese (BR) as the default locale and English as secondary. All landing page content, niche descriptions, pricing, and CTAs are fully translated.
+
+- Default: `/pt` (Portuguese BR)
+- English: `/en`
+- Language toggle in header
 
 ## Architecture
 
@@ -71,7 +92,7 @@ graph TB
 | **operator** | Python + Redis BLPOP | Job queue consumer — creates/manages K8s resources per customer |
 | **billing-worker** | FastAPI + Stripe | Stripe webhook processor — handles checkout, payments, tier changes, cancellations |
 | **token-proxy** | Node.js + pi-ai | Transparent LLM proxy — per-customer auth, rate limits, token quotas, usage metering |
-| **web** | Next.js 14 + Tailwind + shadcn/ui | Landing page, onboarding, customer dashboard, OAuth flows, admin panel |
+| **web** | Next.js 14 + Tailwind + next-intl | Landing page (niche marketplace), onboarding, customer dashboard, OAuth flows, admin panel |
 | **nango-server** | Nango (self-hosted) | OAuth lifecycle — token storage, automatic refresh, encrypted credentials, proxy |
 | **postgres** | PostgreSQL | All persistent data |
 | **redis** | Redis | Job queue, rate limiting, caching, usage event stream |
@@ -80,8 +101,8 @@ graph TB
 
 Every customer gets their own K8s namespace containing:
 
-- **openclaw-gateway** pod — the AI agent (Telegram bot + LLM + native tools + MCP tools)
-- **openclaw-config** Secret — bot token, proxy API key, model config, connection credentials
+- **openclaw-gateway** pod — the AI agent (Telegram bot + LLM + native tools + MCP tools + niche system prompt)
+- **openclaw-config** Secret — bot token, proxy API key, model config, connection credentials, system prompt
 - **ResourceQuota** — CPU/memory limits enforced per tier
 - **NetworkPolicy** — egress restricted to token-proxy, nango-server, and Telegram only
 
@@ -95,34 +116,6 @@ Agents access external services through two mechanisms, depending on the provide
 
 OAuth for all providers is handled by a self-hosted [Nango](https://nango.dev) instance. Tokens are fetched fresh at pod startup — no tokens stored on disk, automatic refresh on every restart.
 
-```mermaid
-sequenceDiagram
-  actor User
-  participant Dashboard
-  participant Nango
-  participant Provider as GitHub / Linear / ...
-  participant API
-  participant Operator
-  participant Agent as Agent Pod
-
-  User->>Dashboard: Click "Connect GitHub"
-  Dashboard->>Nango: Open OAuth popup
-  Nango->>Provider: Redirect to consent screen
-  Provider-->>Nango: Authorization code
-  Nango-->>Dashboard: Connection created
-
-  Dashboard->>API: POST /connections/confirm
-  API->>Operator: Enqueue update_connections job
-  Operator->>Agent: Patch secret + restart pod
-
-  Note over Agent: Startup: fetch tokens from Nango,<br/>export env vars (native) or<br/>write mcporter.json (MCP)
-
-  User->>Agent: "List my Linear issues"
-  Agent->>Agent: exec mcporter call linear.list_issues
-  Note over Agent: mcporter → MCP server → Provider API
-  Agent-->>User: "Here are your issues..."
-```
-
 ### Supported providers
 
 | Provider | Type | How it works |
@@ -134,11 +127,7 @@ sequenceDiagram
 | **Jira** | MCP | `mcp-atlassian` (stdio) via mcporter |
 | **Google** | MCP | `@anthropic/google-drive-mcp` (stdio) via mcporter |
 
-600+ more providers available through Nango. Adding a new native provider requires an env var mapping in `providers.py`. Adding a new MCP provider requires an MCP server entry in `providers.py`.
-
-### Runtime connection requests
-
-If a user asks the agent to access a service that isn't connected yet, the agent generates a deep link (`/connect/<provider>?token=...`) and sends it via Telegram. The user authorizes in their browser, and the agent picks up the new connection on next pod restart.
+600+ more providers available through Nango.
 
 ## Token proxy
 
@@ -160,8 +149,6 @@ Stripe handles all payment processing. The billing flow is fully automated:
 4. **Tier change** → `customer.subscription.updated` → enqueues resize job (adjusts quotas + resources)
 5. **Cancellation** → `customer.subscription.deleted` → enqueues destroy job
 
-Customers manage invoices and payment methods through the Stripe billing portal (`POST /billing/portal-session`).
-
 ## Pricing tiers
 
 | | Starter | Pro | Team |
@@ -181,7 +168,7 @@ Customers manage invoices and payment methods through the Stripe billing portal 
 | **Infrastructure** | Nix flake — Colmena (node management), kubenix (typed K8s manifests), nix2container (OCI images) |
 | **Secrets** | SOPS + age |
 | **API** | FastAPI + SQLAlchemy (async) + Pydantic |
-| **Frontend** | Next.js 14 + Tailwind CSS + shadcn/ui |
+| **Frontend** | Next.js 14 + Tailwind CSS + shadcn/ui + next-intl (PT-BR default, EN) |
 | **LLM proxy** | Node.js + pi-ai (provider abstraction) |
 | **Billing** | Stripe (webhooks → billing-worker) |
 | **OAuth** | Nango (self-hosted) |
@@ -236,7 +223,8 @@ k3d image import ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest -c
 
 | URL | Service |
 |---|---|
-| `http://localhost:3000` | Web (landing, dashboard, admin) |
+| `http://localhost:3000` | Web (landing, dashboard, admin) — redirects to `/pt` |
+| `http://localhost:3000/en` | English version |
 | `http://localhost:8000` | API |
 | `http://localhost:3003` | Nango admin dashboard |
 | `http://localhost:8080` | Token proxy |
@@ -244,7 +232,7 @@ k3d image import ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest -c
 
 ### Provision a test instance
 
-From the admin panel at `/admin`, or via curl:
+From the admin panel at `/pt/admin`, or via curl:
 
 ```bash
 curl -X POST http://localhost:8000/internal/provision \
@@ -254,26 +242,23 @@ curl -X POST http://localhost:8000/internal/provision \
     "telegram_bot_token": "123456:ABC-DEF...",
     "telegram_user_id": 123456789,
     "tier": "starter",
-    "model": "kimi-coding/k2p5"
+    "model": "kimi-coding/k2p5",
+    "niche": "pharmacy"
   }'
 ```
-
-## Production deployment
-
-- **Nodes**: NixOS on Hetzner Cloud, managed declaratively with `colmena apply`
-- **K8s manifests**: Generated from Nix via kubenix — `nix build .#k8s-manifests` → `kubectl apply`
-- **Images**: nix2container (gateway) + Docker Compose (platform services) → pushed to ghcr.io
-- **Secrets**: SOPS-encrypted with age keys
 
 ## Project structure
 
 ```
 apps/
-  api/                  # FastAPI — REST API
-  operator/             # Python — K8s resource manager (Redis job queue)
+  api/                  # FastAPI — REST API (with niches.py)
+  operator/             # Python — K8s resource manager (with niches.py)
   billing-worker/       # FastAPI — Stripe webhook processor
   token-proxy/          # Node.js — LLM proxy with auth + metering
-  web/                  # Next.js — frontend
+  web/                  # Next.js — frontend (i18n: pt/en)
+    messages/           # Translation files (pt.json, en.json)
+    src/i18n/           # next-intl routing, request config, navigation
+    src/app/[locale]/   # All pages under locale prefix
 images/
   openclaw-gateway.nix  # nix2container image for customer pods
 k8s/
@@ -283,7 +268,7 @@ k8s/
 nodes/                  # Colmena NixOS node configs
 scripts/                # dev-setup.sh, dev-import.sh
 db/
-  migrations/           # SQL migrations
+  migrations/           # SQL migrations (003_niches.sql adds niche column)
 docs/                   # Technical design documents
 .github/
   workflows/ci.yml      # Tests + Docker builds on push/PR
@@ -299,8 +284,12 @@ docs/                   # Technical design documents
 - [x] Stripe billing integration (billing-worker + webhook handlers)
 - [x] CI pipeline (GitHub Actions — tests + Docker builds)
 - [x] All services in-cluster (k3d local, K3s prod)
+- [x] Niche agent marketplace (pharmacy first)
+- [x] i18n (Portuguese BR default, English)
+- [x] Niche system prompt injection into gateway pods
 - [ ] JWT RS256 authentication
 - [ ] Conversational onboarding agent
+- [ ] Additional niches (legal, real estate, accounting)
 - [ ] Health monitoring + auto-restart
 - [ ] Production deployment (Hetzner)
 

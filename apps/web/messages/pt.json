@@ -1,0 +1,69 @@
+{
+  "header": {
+    "pricing": "Precos",
+    "dashboard": "Painel",
+    "connections": "Conexoes",
+    "getStarted": "Comecar"
+  },
+  "hero": {
+    "title": "Agentes de IA especializados.",
+    "titleAccent": "Para o seu nicho.",
+    "subtitle": "Escolha um agente especializado para sua area, conecte seus apps e comece a usar via Telegram em segundos.",
+    "cta": "Comecar Agora"
+  },
+  "niches": {
+    "sectionTitle": "Escolha seu nicho",
+    "sectionSubtitle": "Agentes treinados para entender a linguagem e os processos do seu setor.",
+    "comingSoon": "Em breve",
+    "cta": "Comecar",
+    "pharmacy": {
+      "name": "Farmacia",
+      "tagline": "Assistente farmaceutico inteligente",
+      "features": ["Consulta de bulas e interacoes", "Controle de estoque e validade", "Atendimento ao cliente", "Integracao com sistemas de gestao"]
+    },
+    "legal": {
+      "name": "Juridico",
+      "tagline": "Assistente juridico para escritorios",
+      "features": ["Pesquisa de jurisprudencia", "Redacao de pecas", "Controle de prazos", "Gestao de processos"]
+    },
+    "realestate": {
+      "name": "Imobiliario",
+      "tagline": "Assistente para corretores e imobiliarias",
+      "features": ["Gestao de leads", "Descricao de imoveis", "Agendamento de visitas", "Analise de mercado"]
+    },
+    "accounting": {
+      "name": "Contabilidade",
+      "tagline": "Assistente contabil automatizado",
+      "features": ["Classificacao de lancamentos", "Conciliacao bancaria", "Obrigacoes fiscais", "Relatorios gerenciais"]
+    }
+  },
+  "howItWorks": {
+    "title": "Como Funciona",
+    "step1": { "title": "Escolha", "desc": "Selecione o agente especializado para o seu nicho. Sem formularios, sem configuracao." },
+    "step2": { "title": "Assine", "desc": "Escolha um plano e pague com Stripe. Leva 30 segundos." },
+    "step3": { "title": "Use", "desc": "Seu agente de IA esta ao vivo no Telegram em segundos." }
+  },
+  "pricing": {
+    "title": "Precos simples e transparentes",
+    "subtitle": "Sem surpresas. Sem excedentes. Mude de plano quando quiser.",
+    "perMonth": "/mes",
+    "cta": "Comecar",
+    "starter": {
+      "name": "Starter",
+      "features": ["1M tokens / mes", "1 usuario Telegram", "Nivel de raciocinio medio", "Suporte comunidade"]
+    },
+    "pro": {
+      "name": "Pro",
+      "features": ["5M tokens / mes", "1 usuario Telegram", "Nivel de raciocinio medio", "Prompt personalizado", "Suporte email (48h)"]
+    },
+    "team": {
+      "name": "Team",
+      "features": ["20M tokens / mes", "Ate 10 usuarios Telegram", "Nivel de raciocinio alto", "Prompt personalizado", "Suporte email (24h)"]
+    }
+  },
+  "cta": {
+    "title": "Pronto para comecar?",
+    "subtitle": "Configure seu agente de IA especializado em menos de um minuto.",
+    "button": "Comecar Agora"
+  }
+}

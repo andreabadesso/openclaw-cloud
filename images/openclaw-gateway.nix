@@ -30,6 +30,14 @@ let
     # Build allowFrom JSON array from comma-separated string
     ALLOW_JSON=$(printf '%s' "$ALLOW_FROM" | jq -R 'split(",") | map(select(. != "") | tonumber)')
 
+    # Write system prompt as CLAUDE.md if OPENCLAW_SYSTEM_PROMPT is set
+    SYSTEM_PROMPT="''${OPENCLAW_SYSTEM_PROMPT:-}"
+    if [ -n "$SYSTEM_PROMPT" ]; then
+      cat > "$WORKSPACE_DIR/CLAUDE.md" << EOCLAUDE
+$SYSTEM_PROMPT
+EOCLAUDE
+    fi
+
     # Generate AGENTS.md and mcporter.json from OPENCLAW_CONNECTIONS if set
     WORKSPACE_DIR="/root/workspace"
     mkdir -p "$WORKSPACE_DIR"
@@ -211,11 +219,11 @@ EOAGENTS
                 models: [{
                   id: $model_id,
                   name: $model_id,
-                  reasoning: false,
-                  input: ["text"],
+                  reasoning: true,
+                  input: ["text", "image"],
                   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                  contextWindow: 256000,
-                  maxTokens: 8192
+                  contextWindow: 262144,
+                  maxTokens: 32768
                 }]
               }
             }

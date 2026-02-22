@@ -139,6 +139,7 @@ class Box(Base):
         nullable=False,
         server_default="pending",
     )
+    niche: Mapped[str | None] = mapped_column(Text)
     health_failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

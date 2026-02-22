@@ -47,7 +47,6 @@ export default function ConnectionsPage() {
 
       await nango.auth(providerId);
 
-      // After successful OAuth, confirm the connection
       try {
         await api.confirmConnection(providerId);
       } catch {

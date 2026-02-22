@@ -1,0 +1,69 @@
+{
+  "header": {
+    "pricing": "Pricing",
+    "dashboard": "Dashboard",
+    "connections": "Connections",
+    "getStarted": "Get Started"
+  },
+  "hero": {
+    "title": "Specialized AI agents.",
+    "titleAccent": "For your niche.",
+    "subtitle": "Choose a specialized agent for your industry, connect your apps, and start using it via Telegram in seconds.",
+    "cta": "Get Started"
+  },
+  "niches": {
+    "sectionTitle": "Choose your niche",
+    "sectionSubtitle": "Agents trained to understand the language and processes of your industry.",
+    "comingSoon": "Coming soon",
+    "cta": "Get Started",
+    "pharmacy": {
+      "name": "Pharmacy",
+      "tagline": "Intelligent pharmacy assistant",
+      "features": ["Drug interaction & leaflet lookup", "Inventory & expiration control", "Customer service", "Management system integration"]
+    },
+    "legal": {
+      "name": "Legal",
+      "tagline": "Legal assistant for law firms",
+      "features": ["Case law research", "Legal document drafting", "Deadline management", "Case management"]
+    },
+    "realestate": {
+      "name": "Real Estate",
+      "tagline": "Assistant for realtors and agencies",
+      "features": ["Lead management", "Property descriptions", "Visit scheduling", "Market analysis"]
+    },
+    "accounting": {
+      "name": "Accounting",
+      "tagline": "Automated accounting assistant",
+      "features": ["Entry classification", "Bank reconciliation", "Tax obligations", "Management reports"]
+    }
+  },
+  "howItWorks": {
+    "title": "How It Works",
+    "step1": { "title": "Choose", "desc": "Select the specialized agent for your niche. No forms, no config." },
+    "step2": { "title": "Subscribe", "desc": "Pick a plan and check out with Stripe. Takes 30 seconds." },
+    "step3": { "title": "Use", "desc": "Your personal AI agent is live on Telegram within seconds." }
+  },
+  "pricing": {
+    "title": "Simple, Transparent Pricing",
+    "subtitle": "No surprise bills. No overages. Upgrade or downgrade anytime.",
+    "perMonth": "/month",
+    "cta": "Get Started",
+    "starter": {
+      "name": "Starter",
+      "features": ["1M tokens / month", "1 Telegram user", "Medium thinking level", "Community support"]
+    },
+    "pro": {
+      "name": "Pro",
+      "features": ["5M tokens / month", "1 Telegram user", "Medium thinking level", "Custom system prompt", "Email support (48h)"]
+    },
+    "team": {
+      "name": "Team",
+      "features": ["20M tokens / month", "Up to 10 Telegram users", "High thinking level", "Custom system prompt", "Email support (24h)"]
+    }
+  },
+  "cta": {
+    "title": "Ready to get started?",
+    "subtitle": "Set up your specialized AI agent in under a minute.",
+    "button": "Get Started"
+  }
+}

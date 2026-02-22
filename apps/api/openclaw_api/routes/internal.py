@@ -19,6 +19,7 @@ from openclaw_api.models import (
     Tier,
     UsageMonthly,
 )
+from openclaw_api.niches import NICHES
 from openclaw_api.schemas import (
     BoxListItem,
     BoxListResponse,
@@ -55,6 +56,10 @@ async def provision_box(
         db.add(customer)
         await db.flush()
 
+    # Validate niche if provided
+    if body.niche and body.niche not in NICHES:
+        raise HTTPException(status_code=400, detail=f"Unknown niche: {body.niche}")
+
     # Check for existing active box
     existing = await db.execute(
         select(Box)
@@ -87,6 +92,7 @@ async def provision_box(
         language=body.language,
         model=body.model,
         thinking_level=body.thinking_level,
+        niche=body.niche,
         status=BoxStatus.pending,
     )
     db.add(box)
@@ -114,6 +120,7 @@ async def provision_box(
             "model": body.model,
             "thinking_level": body.thinking_level,
             "language": body.language,
+            "niche": body.niche,
         },
     )
     db.add(job)

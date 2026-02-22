@@ -14,6 +14,7 @@ from ..k8s import (
     create_resource_quota,
     wait_for_pod_ready,
 )
+from ..niches import NICHES
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,8 @@ async def handle_provision(payload: dict, customer_id: str, db: AsyncSession) ->
     telegram_allow_from = payload.get("telegram_allow_from") or payload.get("telegram_user_id")
     model = payload.get("model", "kimi-coding/k2p5")
     thinking = payload.get("thinking", "medium")
+    niche_slug = payload.get("niche")
+    niche_config = NICHES.get(niche_slug) if niche_slug else None
 
     # 1. Register proxy token with token-proxy (it generates the token for us)
     async with httpx.AsyncClient() as client:
@@ -56,6 +59,7 @@ async def handle_provision(payload: dict, customer_id: str, db: AsyncSession) ->
         proxy_token=proxy_token,
         model=model,
         thinking=thinking,
+        system_prompt=niche_config.system_prompt if niche_config else None,
     )
 
     # 4. Create ResourceQuota

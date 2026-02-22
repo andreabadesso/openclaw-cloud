@@ -111,21 +111,25 @@ def create_config_secret(
     proxy_token: str,
     model: str,
     thinking: str,
+    system_prompt: str | None = None,
 ) -> None:
     ns = namespace_name(customer_id)
+    data = {
+        "TELEGRAM_BOT_TOKEN": telegram_bot_token,
+        "TELEGRAM_ALLOW_FROM": telegram_allow_from,
+        "KIMI_API_KEY": proxy_token,
+        "KIMI_BASE_URL": f"{settings.token_proxy_url}/v1",
+        "OPENCLAW_MODEL": model,
+        "OPENCLAW_THINKING": thinking,
+        "NODE_OPTIONS": "--max-old-space-size=896",
+    }
+    if system_prompt:
+        data["OPENCLAW_SYSTEM_PROMPT"] = system_prompt
     core_v1().create_namespaced_secret(
         namespace=ns,
         body=V1Secret(
             metadata=V1ObjectMeta(name="openclaw-config"),
-            string_data={
-                "TELEGRAM_BOT_TOKEN": telegram_bot_token,
-                "TELEGRAM_ALLOW_FROM": telegram_allow_from,
-                "KIMI_API_KEY": proxy_token,
-                "KIMI_BASE_URL": f"{settings.token_proxy_url}/v1",
-                "OPENCLAW_MODEL": model,
-                "OPENCLAW_THINKING": thinking,
-                "NODE_OPTIONS": "--max-old-space-size=896",
-            },
+            string_data=data,
         ),
     )
     logger.info("Created secret openclaw-config in %s", ns)

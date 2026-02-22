@@ -33,6 +33,7 @@ export interface Box {
   thinking_level: string;
   language: string;
   tier: string;
+  niche: string | null;
   tokens_used: number;
   tokens_limit: number;
   telegram_user_ids: number[];
@@ -48,6 +49,7 @@ export interface ProvisionRequest {
   model: string;
   thinking_level: string;
   language: string;
+  niche?: string;
 }
 
 export interface Connection {

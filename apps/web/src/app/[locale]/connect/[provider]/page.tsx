@@ -47,7 +47,6 @@ export default function ConnectProviderPage() {
         if (popup?.closed) {
           clearInterval(interval);
           try {
-            // Confirm the connection (syncs to local DB + triggers pod secret update)
             const confirmRes = await fetch(`/api/me/connections/${provider}/confirm`, {
               method: "POST",
               headers: { "Content-Type": "application/json", "X-Customer-Id": custId },
@@ -55,7 +54,6 @@ export default function ConnectProviderPage() {
             if (confirmRes.ok) {
               setState("success");
             } else {
-              // Confirm failed — check if connection exists anyway
               const checkRes = await fetch(`/api/me/connections`, {
                 headers: { "X-Customer-Id": custId },
               });
@@ -83,7 +81,6 @@ export default function ConnectProviderPage() {
     }
   }, [provider]);
 
-  // Validate token on mount
   useEffect(() => {
     if (!token) {
       setState("error");
@@ -165,7 +162,6 @@ export default function ConnectProviderPage() {
     );
   }
 
-  // Error state
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
