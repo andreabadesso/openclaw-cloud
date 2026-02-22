@@ -2,156 +2,177 @@
 
 ---
 
-## Phase 0 — Manual MVP (Week 1–2)
+## Phase 0 — Manual MVP (Week 1–2) ✅
 
 **Goal**: Prove people will pay. Do everything manually. Write zero platform code.
 
-1. Static landing page (Vercel, Carrd, whatever — doesn't matter)
+1. Static landing page
 2. Typeform for onboarding: collect Telegram token, use case, Telegram user ID
 3. Stripe Payment Link for each tier
-4. YOU manually provision: spin up a Hetzner VM, deploy `openclaw-box` with nixos-anywhere, inject their secrets
+4. Manually provision: spin up K8s pod, inject secrets
 5. Email the customer when their bot is live
 
-**What you learn**: What questions do users have? What do they actually use the agent for? What breaks? What tier do they naturally gravitate toward?
-
-**Success criteria**: 5 paying customers. Real money. Real feedback. You have done everything manually and understand the pain you're automating.
+**Status**: Complete. Moved on to automated platform.
 
 ---
 
-## Phase 1 — K8s Platform + Automated Provisioning (Week 3–8)
+## Phase 1 — K8s Platform + Automated Provisioning ✅
 
 **Goal**: Automate everything. Remove yourself from the loop.
 
-### Week 3–4: Cluster Bootstrap
+### Cluster Bootstrap ✅
 
-- [ ] Provision 3 Hetzner VMs (1 control plane, 2 workers)
-- [ ] Write `nodes/common.nix`, `nodes/control-plane.nix`, `nodes/worker.nix`
-- [ ] Set up SOPS for K3s token secret
-- [ ] Deploy cluster with nixos-anywhere + Colmena
-- [ ] Install cert-manager + ingress-nginx via Helm (or kubenix)
-- [ ] Set up ghcr.io image registry access
-- [ ] Verify K3s cluster is healthy (`kubectl get nodes`)
+- [x] k3d local dev cluster (matching prod architecture)
+- [x] kubenix for all K8s manifests (typed Nix → JSON)
+- [x] nix2container for gateway image
+- [x] Platform namespace with all services deployed in-cluster
+- [x] NodePort services for local access
 
-### Week 5: Build the OpenClaw Image
+### OpenClaw Gateway Image ✅
 
-- [ ] Write `images/openclaw-gateway.nix` (nix2container)
-- [ ] Build image: `nix build .#openclaw-image`
-- [ ] Push to ghcr.io: `nix run .#openclaw-image.copyToRegistry`
-- [ ] Manually test: `kubectl run test --image=ghcr.io/.../openclaw-gateway --env-file=test.env`
-- [ ] Verify bot responds on Telegram
+- [x] `images/openclaw-gateway.nix` — nix2container image with entrypoint
+- [x] Entrypoint: reads env vars → builds `openclaw.json` config → starts gateway
+- [x] Bootstrap files: `SOUL.md`, `TOOLS.md`, `IDENTITY.md` for agent behavior
+- [x] Dynamic connection discovery via API (agents curl the connections endpoint)
+- [x] Browser profile config from `OPENCLAW_BROWSER_PROXY_URL`
+- [x] MCP integration via mcporter config generation
 
-### Week 6: Operator + Provisioning
+### Operator ✅
 
-- [ ] Postgres schema: `customers`, `boxes`, `subscriptions`, `proxy_tokens`, `usage_monthly`, `operator_jobs`
-- [ ] Redis running in-cluster
-- [ ] `operator` service — implement `provision`, `destroy`, `suspend`, `reactivate` jobs
-- [ ] Operator ClusterRole + ServiceAccount
-- [ ] Token-proxy: register/revoke proxy tokens internal API
-- [ ] End-to-end test: submit provision job to Redis → customer pod running → bot works
+- [x] Postgres schema: customers, boxes, subscriptions, proxy_tokens, usage_monthly, operator_jobs
+- [x] Redis job queue (BLPOP consumer)
+- [x] Jobs: provision, destroy, suspend, reactivate, resize, update_connections
+- [x] Per-customer: namespace, secret, deployment, resource quota, network policy
+- [x] Scale 0 → scale 1 for rolling updates (quota-safe)
+- [x] Pod metrics collection (K8s metrics API → Postgres)
 
-### Week 7: Token Proxy
+### Token Proxy ✅
 
-- [ ] `token-proxy` FastAPI service
-- [ ] Proxy token auth (Redis cache + Postgres lookup)
-- [ ] Usage recording (async write to Postgres)
-- [ ] Hard limit enforcement (429 response)
-- [ ] Rate limiting (10 req/s per token)
-- [ ] Deploy to cluster, configure ingress (`proxy.openclaw.cloud`)
-- [ ] Update openclaw-gateway image to use proxy URL
+- [x] Node.js + pi-ai (provider abstraction layer)
+- [x] Proxy token auth (bcrypt-hashed, Redis-cached)
+- [x] Usage recording (Redis stream → batch Postgres writes)
+- [x] Hard limit enforcement (429 response)
+- [x] Rate limiting (token bucket, 10 req/s per customer)
+- [x] OpenAI `developer` role message support
+- [x] Full tool call streaming (`toolcall_start`/`toolcall_delta` → OpenAI format)
+- [x] Non-streaming tool call support with `finish_reason: "tool_calls"`
 
-### Week 8: API + Billing Worker
+### API ✅
 
-- [ ] `api` FastAPI: auth (JWT), `/me`, `/me/box`, `/me/usage`, Stripe webhook endpoint
-- [ ] `billing-worker`: handle `checkout.session.completed` → enqueue provision job
-- [ ] `billing-worker`: handle `invoice.payment_succeeded` → reset token counter
-- [ ] `billing-worker`: handle `customer.subscription.deleted` → enqueue destroy job
-- [ ] Stripe products + prices created in Stripe dashboard
-- [ ] Manual end-to-end test: pay via Stripe → provision job enqueued → bot live
+- [x] FastAPI + SQLAlchemy (async)
+- [x] Provisioning endpoints (internal + admin)
+- [x] Customer connections management (list, authorize, confirm, delete, reconnect)
+- [x] Agent API: `GET /internal/agent/connections`, `POST /internal/agent/connect-link`
+- [x] Connect link deep-link flow with `web_url` config (LAN/SSH tunnel friendly)
+- [x] Usage tracking endpoints
+- [x] Stripe webhook endpoint
 
-**Phase 1 exit criteria**: Customer pays on Stripe → bot is live on Telegram within 60 seconds. No human involvement.
+### Billing Worker ✅
 
----
-
-## Phase 2 — Onboarding Agent (Week 9–12)
-
-**Goal**: Replace the Typeform with a conversational AI flow.
-
-### Week 9–10: Onboarding Agent Core
-
-- [ ] `onboarding-agent` service (Python + LangChain + Kimi)
-- [ ] Session state machine in Redis
-- [ ] System prompt + conversation flow (see `02-onboarding-agent.md`)
-- [ ] Telegram bot token validation
-- [ ] Config JSON output → call API to create pending customer + trigger Stripe checkout
-- [ ] WebSocket relay in `api` service (`/onboarding/chat/{session_id}`)
-
-### Week 11: Onboarding UI
-
-- [ ] `web` Next.js: chat interface with streaming WebSocket
-- [ ] Session resume on reconnect (cookie → Redis session)
-- [ ] Provisioning progress stream (WebSocket events during pod startup)
-- [ ] "Your agent is live!" final screen with Telegram bot link
-
-### Week 12: Telegram Onboarding
-
-- [ ] Dedicated onboarding Telegram bot (`@OpenClawSetupBot`)
-- [ ] Same onboarding-agent backend, Telegram transport
-- [ ] Session resume via Telegram user ID
-- [ ] Payment link sent via Telegram message after tier selection
-
-**Phase 2 exit criteria**: Complete onboarding entirely through chat (web or Telegram), no forms.
+- [x] `checkout.session.completed` → create subscription → enqueue provision
+- [x] `invoice.payment_succeeded` → reset token counter, reactivate if suspended
+- [x] `invoice.payment_failed` → suspend after 3 failures
+- [x] `customer.subscription.updated` → enqueue resize
+- [x] `customer.subscription.deleted` → enqueue destroy
 
 ---
 
-## Phase 3 — Dashboard & Self-Serve (Week 13–16)
+## Phase 1.5 — External Integrations ✅
 
-- [ ] Customer dashboard: pod status, token usage chart, billing link
-- [ ] Agent settings editor (add/remove Telegram users, change model, change thinking level)
-- [ ] `update` operator job wired to dashboard settings
-- [ ] Stripe Customer Portal integration (plan change, cancel)
-- [ ] Email notifications: provisioned, 90% token warning, payment failure, suspension
-- [ ] Admin panel: list all customers, boxes, jobs, usage
+### Nango OAuth ✅
 
-**Phase 3 exit criteria**: Zero support tickets for "how do I change X?".
+- [x] Self-hosted Nango instance (in-cluster)
+- [x] 6 providers configured: GitHub, Google, Slack, Linear, Notion, Jira
+- [x] Native integrations: env var injection (GH_TOKEN, NOTION_API_KEY, SLACK_BOT_TOKEN)
+- [x] MCP integrations: mcporter config generation (Linear, Jira, Google)
+- [x] Connect sessions via `@nangohq/frontend` SDK
+- [x] Dashboard connections page (provider grid, connect/disconnect/reconnect)
+- [x] Deep-link connect page (`/en/connect/{provider}?token=...`) for agent-initiated OAuth
+- [x] Connection sync: customer_connections table → operator job → pod secret update → restart
+
+### Browser Proxy ✅
+
+- [x] Node.js + ws (CDP WebSocket proxy)
+- [x] HTTP `/json/*` forwarding with URL rewriting
+- [x] WebSocket `/devtools/*` bidirectional piping
+- [x] Per-customer auth (proxy token as Basic auth)
+- [x] Session limits (max 2 concurrent, 10 min max duration)
+- [x] Usage tracking: Redis stream → Postgres `browser_sessions` table
+- [x] Gateway auto-config via `OPENCLAW_BROWSER_PROXY_URL`
+
+### Web Frontend ✅
+
+- [x] Next.js 14 + Tailwind CSS + shadcn/ui
+- [x] next-intl (Portuguese BR default, English)
+- [x] Niche agent marketplace landing page
+- [x] Customer dashboard (connections, usage)
+- [x] Deep-link OAuth connect page (Nango frontend SDK)
+- [x] Admin panel
+- [x] API proxy rewrites (no CORS issues from LAN)
 
 ---
 
-## Phase 4 — Reliability & Scale (Month 5–6)
+## v1.0.0-beta — Tagged 2026-02-22 🏷️
 
+Everything above is complete and working end-to-end. Agent can:
+- Respond via Telegram with domain knowledge
+- Make tool calls through the token proxy
+- Browse the web via CDP proxy
+- Discover and request OAuth connections at runtime
+- Access external services (GitHub, Google, Slack, etc.) via native tools or MCP
+
+---
+
+## Phase 2 — Production Ready (Next)
+
+**Goal**: Ship to real users. Harden, monitor, deploy.
+
+### Authentication & Security
+- [ ] JWT RS256 authentication (replace placeholder X-Customer-Id header)
+- [ ] External Secrets Operator or SOPS-encrypted platform-secrets
+- [ ] Rate limiting on public API endpoints
+
+### Production Deployment
+- [ ] Provision Hetzner VMs (control plane + workers)
+- [ ] Colmena node configs (`nodes/common.nix`, `nodes/control-plane.nix`, `nodes/worker.nix`)
+- [ ] cert-manager + ingress-nginx (HTTPS)
+- [ ] DNS setup (openclaw.cloud)
+- [ ] ghcr.io image registry access from prod cluster
+- [ ] SOPS for K3s token + all secrets
+
+### Monitoring & Reliability
+- [ ] Per-customer analytics dashboard (CPU, memory, token usage, browser sessions)
+- [ ] Health monitoring + auto-restart for gateway pods
 - [ ] Prometheus + Grafana monitoring stack
-- [ ] AlertManager → Slack + PagerDuty
-- [ ] External Secrets Operator + Vault (replace manual `platform-secrets`)
-- [ ] Automatic worker node scaling (Cluster Autoscaler for Hetzner)
-- [ ] Load testing: 500 concurrent customer pods, 100 simultaneous provisioning jobs
-- [ ] kubenix for all platform manifests (replace any remaining raw YAML)
-- [ ] GitHub Actions CI: build images + manifests + deploy to staging + smoke test
+- [ ] AlertManager → Slack notifications
+
+### Onboarding
+- [ ] Conversational onboarding agent (web chat + Telegram)
+- [ ] Session state machine in Redis
+- [ ] Provisioning progress stream (WebSocket events)
 
 ---
 
-## Key Files to Build First
+## Phase 3 — Growth (Later)
 
-This is the critical path. These files unblock everything else:
-
-```
-1. nodes/common.nix              → get the cluster running
-2. images/openclaw-gateway.nix   → get the customer pod working
-3. apps/token-proxy/main.py      → get Kimi calls metered
-4. apps/operator/operator/main.py → get provisioning automated
-5. db/migrations/001_initial.sql  → get the schema in place
-6. apps/api/openclaw_api/main.py  → get auth + Stripe webhooks working
-```
-
-Everything else (web UI, onboarding agent, monitoring) is additive on top of this foundation.
+- [ ] Additional niches (legal, real estate, accounting)
+- [ ] Customer self-serve dashboard (change model, thinking level, Telegram users)
+- [ ] Stripe Customer Portal integration
+- [ ] Email notifications (provisioned, 90% token warning, payment failure)
+- [ ] Multi-region deployment
+- [ ] Automatic worker node scaling
 
 ---
 
-## What Not to Build (Yet)
+## Key Decisions
 
-- Custom Telegram bot framework — openclaw-box's existing Telegram integration works
-- Custom LLM inference — Kimi API is the right call at this scale
-- Multi-region deployment — Hetzner single-region is fine until MRR > $50k
-- Mobile app — Telegram is the mobile app
-- Kubernetes operator (CRDs) for customer resources — the operator service + Redis queue is simpler and sufficient for thousands of customers
+- **K8s pods, not VMs** — per-customer isolation with much lower overhead
+- **Token proxy pattern** — customer pods never hold real API keys
+- **Nango for OAuth** — self-hosted, handles 600+ providers, automatic token refresh
+- **Bootstrap files over system prompt** — SOUL.md/TOOLS.md/IDENTITY.md give the agent structured behavior
+- **pi-ai for LLM abstraction** — provider-agnostic, handles streaming + tool calls
+- **mcporter for MCP** — lightweight stdio/HTTP bridge for MCP servers
+- **kubenix for manifests** — typed Nix, no YAML drift, single `nix build` for all resources
 
 ---
 
