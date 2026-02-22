@@ -39,7 +39,7 @@ async def authorize_connection(
 
     return ConnectSessionResponse(
         session_token=result["data"]["token"],
-        connect_url=f"{settings.nango_public_url}/connect/{result['data']['token']}",
+        connect_url="",
     )
 
 
@@ -200,13 +200,13 @@ async def reconnect_connection(
         raise HTTPException(status_code=404, detail="Connection not found")
 
     try:
-        session_result = await nango.create_connect_session(customer_id, conn.provider)
+        result = await nango.create_connect_session(customer_id, conn.provider)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Nango error: {exc}") from exc
 
     return ConnectSessionResponse(
-        session_token=session_result["data"]["token"],
-        connect_url=f"{settings.nango_public_url}/connect/{session_result['data']['token']}",
+        session_token=result["data"]["token"],
+        connect_url="",
     )
 
 

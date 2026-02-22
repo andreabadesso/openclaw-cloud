@@ -86,8 +86,8 @@ async def agent_create_connect_link(
     _verify_agent_secret(authorization)
     token = secrets.token_urlsafe(32)
     await r.set(f"connect-link:{token}", body.customer_id, ex=900)
-    base = settings.cors_origins.split(",")[0]
-    url = f"{base}/connect/{body.provider}?token={token}"
+    base = settings.web_url.rstrip("/")
+    url = f"{base}/en/connect/{body.provider}?token={token}"
     return ConnectLinkResponse(url=url)
 
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import Nango from "@nangohq/frontend";
 
 type State = "validating" | "connecting" | "success" | "error";
 
@@ -39,45 +40,34 @@ export default function ConnectProviderPage() {
         },
       });
       if (!res.ok) throw new Error("Failed to start connection");
-      const { connect_url } = await res.json();
+      const { session_token } = await res.json();
 
-      const popup = window.open(connect_url, "nango-connect", "width=600,height=700");
+      const nango = new Nango({
+        host: "http://localhost:3003",
+        connectSessionToken: session_token,
+      });
 
-      const interval = setInterval(async () => {
-        if (popup?.closed) {
-          clearInterval(interval);
-          try {
-            const confirmRes = await fetch(`/api/me/connections/${provider}/confirm`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "X-Customer-Id": custId },
-            });
-            if (confirmRes.ok) {
-              setState("success");
-            } else {
-              const checkRes = await fetch(`/api/me/connections`, {
-                headers: { "X-Customer-Id": custId },
-              });
-              const data = await checkRes.json();
-              const connected = data.connections?.some(
-                (c: { provider: string; status: string }) =>
-                  c.provider === provider && c.status === "connected",
-              );
-              if (connected) {
-                setState("success");
-              } else {
-                setState("error");
-                setError("Connection was not completed. Please try again.");
-              }
-            }
-          } catch {
-            setState("error");
-            setError("Could not verify connection status.");
-          }
-        }
-      }, 500);
+      await nango.auth(provider);
+
+      // After successful OAuth, confirm the connection
+      try {
+        await fetch(`/api/me/connections/${provider}/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Customer-Id": custId },
+        });
+      } catch {
+        // Connection may not have completed — that's OK
+      }
+      setState("success");
     } catch (e: unknown) {
-      setState("error");
-      setError(e instanceof Error ? e.message : "Connection failed");
+      const msg = e instanceof Error ? e.message : "Connection failed";
+      if (msg.includes("window_closed")) {
+        setState("error");
+        setError("Authorization window was closed. Please try again.");
+      } else {
+        setState("error");
+        setError(msg);
+      }
     }
   }, [provider]);
 

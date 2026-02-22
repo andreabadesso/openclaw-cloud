@@ -23,7 +23,9 @@ in {
                 { name = "NANGO_SERVER_URL";  value = "http://nango-server.platform.svc.cluster.local:8080"; }
                 { name = "NANGO_PUBLIC_URL"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_server_url"; }; }
                 { name = "NANGO_SECRET_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_secret_key"; }; }
+                { name = "NANGO_PUBLIC_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_public_key"; }; }
                 { name = "AGENT_API_SECRET"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "agent_api_secret"; }; }
+                { name = "WEB_URL";            valueFrom.secretKeyRef = { name = "platform-secrets"; key = "web_url"; }; }
                 { name = "REDIS_OPERATOR_QUEUE"; value = "operator:jobs"; }
                 { name = "PORT";             value = "8000"; }
               ];

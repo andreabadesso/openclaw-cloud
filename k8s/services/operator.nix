@@ -24,7 +24,7 @@ in {
                 { name = "NANGO_SECRET_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_secret_key"; }; }
                 { name = "AGENT_API_SECRET"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "agent_api_secret"; }; }
                 { name = "API_URL";          value = "http://api.platform.svc.cluster.local:8000"; }
-                { name = "WEB_URL";          value = "http://localhost:3000"; }
+                { name = "WEB_URL";          valueFrom.secretKeyRef = { name = "platform-secrets"; key = "web_url"; }; }
                 { name = "KUBE_NAMESPACE_PREFIX"; value = "customer-"; }
                 { name = "OPENCLAW_IMAGE";  value = "ghcr.io/andreabadesso/openclaw-cloud/openclaw-gateway:latest"; }
               ];
