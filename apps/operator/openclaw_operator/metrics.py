@@ -57,10 +57,6 @@ async def collect_pod_metrics(session_factory: async_sessionmaker[AsyncSession])
             continue
         customer_id = m.group(1)
 
-        labels = item["metadata"].get("labels", {})
-        if labels.get("app") != "openclaw-gateway":
-            continue
-
         for container in item.get("containers", []):
             usage = container.get("usage", {})
             cpu_str = usage.get("cpu", "0")
@@ -133,6 +129,7 @@ async def rollup_hourly(session_factory: async_sessionmaker[AsyncSession]) -> No
 
 async def metrics_loop(session_factory: async_sessionmaker[AsyncSession]) -> None:
     """Collect metrics every 60s, roll up every ~60 ticks (~1h)."""
+    logger.info("Metrics collector started")
     tick = 0
     while True:
         try:

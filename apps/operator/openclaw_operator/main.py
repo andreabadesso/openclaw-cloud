@@ -184,10 +184,15 @@ async def job_loop() -> None:
     _healthy = True
     logger.info("Operator started, listening on queue: %s", settings.job_queue)
 
+    loop = asyncio.get_running_loop()
     while not _shutdown_event.is_set():
         try:
-            # BLPOP with 1s timeout so we can check for shutdown
-            result = r.blpop(settings.job_queue, timeout=1)
+            # BLPOP with 1s timeout so we can check for shutdown.
+            # Run in executor to avoid blocking the event loop (other async
+            # tasks like metrics_loop need to run concurrently).
+            result = await loop.run_in_executor(
+                None, lambda: r.blpop(settings.job_queue, timeout=1)
+            )
             if result is None:
                 continue
             _, raw = result
