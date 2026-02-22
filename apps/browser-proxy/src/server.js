@@ -18,11 +18,16 @@ import pg from "pg";
 const { Pool } = pg;
 
 // Initialize connections
+// IMPORTANT: separate Redis clients for blocking vs non-blocking operations.
+// The usage consumer uses XREADGROUP with BLOCK which holds the connection for
+// up to 5s at a time. If we share one client, ALL Redis ops (auth cache lookups,
+// session events) are blocked waiting for the XREADGROUP to release.
 const redis = new Redis(config.redisUrl);
+const redisBlocking = new Redis(config.redisUrl);
 const pool = new Pool({ connectionString: config.databaseUrl, max: 10 });
 
-// Start background usage consumer
-startUsageConsumer(redis, pool);
+// Start background usage consumer (uses its own blocking Redis client)
+startUsageConsumer(redisBlocking, pool);
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -58,7 +63,32 @@ const server = http.createServer(async (req, res) => {
 
 // ─── /json/* handler ────────────────────────────────────────────────
 
+// Cache /json/version responses for 30s to avoid 800ms+ Browserless round-trips
+// on every CDP health check from the gateway.
+let versionCache = { data: null, host: null, expiry: 0 };
+
 async function handleJson(req, res) {
+  // Serve /json/version from cache if fresh
+  if (req.url.startsWith("/json/version")) {
+    // Pre-warm auth cache: if ?token= is present, AWAIT authenticateToken so the
+    // subsequent WS health check (which also carries ?token=) hits the Redis cache
+    // instead of running slow bcrypt comparisons (~700ms each on limited CPU).
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const token = url.searchParams.get("token");
+      if (token) {
+        await authenticateToken(token, redis, pool);
+      }
+    } catch { /* ignore */ }
+
+    const proxyHost = req.headers.host || `localhost:${config.port}`;
+    if (versionCache.data && versionCache.host === proxyHost && Date.now() < versionCache.expiry) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(versionCache.data));
+      return;
+    }
+  }
+
   const upstreamUrl = buildUpstreamHttpUrl(req.url);
 
   let upstream;
@@ -79,6 +109,12 @@ async function handleJson(req, res) {
     const data = JSON.parse(body);
     const proxyHost = req.headers.host || `localhost:${config.port}`;
     const rewritten = rewriteUrls(data, proxyHost);
+
+    // Cache /json/version
+    if (req.url.startsWith("/json/version")) {
+      versionCache = { data: rewritten, host: proxyHost, expiry: Date.now() + 30_000 };
+    }
+
     res.writeHead(upstream.status, { "content-type": contentType });
     res.end(JSON.stringify(rewritten));
   } catch {
@@ -92,8 +128,15 @@ async function handleJson(req, res) {
 
 server.on("upgrade", async (req, socket, head) => {
   try {
-    // 1. Authenticate (Bearer token or Basic auth where username = token)
-    const token = extractToken(req.headers.authorization || "");
+    // 1. Authenticate (Bearer/Basic header, or ?token= query param)
+    let token = extractToken(req.headers.authorization || "");
+    if (!token) {
+      // Fallback: extract token from query string (?token=xxx)
+      try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        token = url.searchParams.get("token") || null;
+      } catch { /* ignore */ }
+    }
     if (!token) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
@@ -124,91 +167,99 @@ server.on("upgrade", async (req, socket, head) => {
       return;
     }
 
-    // 3. Build upstream WebSocket URL
-    const upstreamUrl = buildUpstreamWsUrl(req.url);
+    // 3. Accept the downstream WebSocket immediately so health checks
+    //    (gateway's canOpenWebSocket) get "open" fast without waiting
+    //    for the ~5s Browserless upstream connection.
+    const wss = new WebSocketServer({ noServer: true });
+    wss.handleUpgrade(req, socket, head, (downstreamWs) => {
+      // 4. Build upstream WebSocket URL and connect lazily
+      const upstreamUrl = buildUpstreamWsUrl(req.url);
+      const upstreamWs = new WebSocket(upstreamUrl);
 
-    // 4. Connect to Browserless upstream
-    const upstreamWs = new WebSocket(upstreamUrl);
+      // Buffer downstream messages until upstream is ready
+      const pendingMessages = [];
+      let upstreamReady = false;
 
-    upstreamWs.on("error", (err) => {
-      console.error("Upstream WS error:", err.message);
-      socket.write("HTTP/1.1 502 Bad Gateway\r\n\r\n");
-      socket.destroy();
-    });
+      // 5. Register session
+      let sessionId;
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        const info = removeSession(sessionId);
+        if (info) {
+          console.log(
+            `Session ${sessionId} closed (customer=${info.customerId}, duration=${info.durationMs}ms)`,
+          );
+          pushSessionEvent(redis, {
+            customer_id: info.customerId,
+            session_id: sessionId,
+            event_type: "session_end",
+            duration_ms: info.durationMs,
+          }).catch((err) => console.error("Failed to push session_end event:", err));
+        }
+      };
 
-    upstreamWs.on("open", () => {
-      // 5. Accept the downstream upgrade
-      const wss = new WebSocketServer({ noServer: true });
-      wss.handleUpgrade(req, socket, head, (downstreamWs) => {
-        // 6. Register session
-        let sessionId;
+      sessionId = createSession(customerId, upstreamWs, downstreamWs, () => {
+        // Max duration timeout
+        try { upstreamWs.close(1000, "Session timeout"); } catch { /* ignore */ }
+        try { downstreamWs.close(1000, "Session timeout"); } catch { /* ignore */ }
+      });
 
-        let cleaned = false;
-        const cleanup = () => {
-          if (cleaned) return;
-          cleaned = true;
-          const info = removeSession(sessionId);
-          if (info) {
-            console.log(
-              `Session ${sessionId} closed (customer=${info.customerId}, duration=${info.durationMs}ms)`,
-            );
-            pushSessionEvent(redis, {
-              customer_id: info.customerId,
-              session_id: sessionId,
-              event_type: "session_end",
-              duration_ms: info.durationMs,
-            }).catch((err) => console.error("Failed to push session_end event:", err));
-          }
-        };
+      console.log(`Session ${sessionId} opened (customer=${customerId})`);
 
-        sessionId = createSession(customerId, upstreamWs, downstreamWs, () => {
-          // Max duration timeout
-          try { upstreamWs.close(1000, "Session timeout"); } catch { /* ignore */ }
-          try { downstreamWs.close(1000, "Session timeout"); } catch { /* ignore */ }
-        });
+      pushSessionEvent(redis, {
+        customer_id: customerId,
+        session_id: sessionId,
+        event_type: "session_start",
+      }).catch((err) => console.error("Failed to push session_start event:", err));
 
-        console.log(`Session ${sessionId} opened (customer=${customerId})`);
+      // 6. Downstream → upstream (buffer until upstream ready)
+      downstreamWs.on("message", (data, isBinary) => {
+        if (upstreamReady && upstreamWs.readyState === WebSocket.OPEN) {
+          upstreamWs.send(data, { binary: isBinary });
+        } else {
+          pendingMessages.push({ data, isBinary });
+        }
+      });
 
-        pushSessionEvent(redis, {
-          customer_id: customerId,
-          session_id: sessionId,
-          event_type: "session_start",
-        }).catch((err) => console.error("Failed to push session_start event:", err));
-
-        // 7. Bidirectional piping
-        downstreamWs.on("message", (data, isBinary) => {
+      // 7. When upstream opens, flush buffer and start piping
+      upstreamWs.on("open", () => {
+        upstreamReady = true;
+        for (const msg of pendingMessages) {
           if (upstreamWs.readyState === WebSocket.OPEN) {
-            upstreamWs.send(data, { binary: isBinary });
+            upstreamWs.send(msg.data, { binary: msg.isBinary });
           }
-        });
+        }
+        pendingMessages.length = 0;
+      });
 
-        upstreamWs.on("message", (data, isBinary) => {
-          if (downstreamWs.readyState === WebSocket.OPEN) {
-            downstreamWs.send(data, { binary: isBinary });
-          }
-        });
+      upstreamWs.on("message", (data, isBinary) => {
+        if (downstreamWs.readyState === WebSocket.OPEN) {
+          downstreamWs.send(data, { binary: isBinary });
+        }
+      });
 
-        // 8. Cleanup on close/error
-        downstreamWs.on("close", () => {
-          try { upstreamWs.close(1000); } catch { /* ignore */ }
-          cleanup();
-        });
-        downstreamWs.on("error", (err) => {
-          console.error(`Downstream WS error (session=${sessionId}):`, err.message);
-          try { upstreamWs.close(1000); } catch { /* ignore */ }
-          cleanup();
-        });
+      // 8. Cleanup on close/error
+      downstreamWs.on("close", () => {
+        try { upstreamWs.close(1000); } catch { /* ignore */ }
+        cleanup();
+      });
+      downstreamWs.on("error", (err) => {
+        console.error(`Downstream WS error (session=${sessionId}):`, err.message);
+        try { upstreamWs.close(1000); } catch { /* ignore */ }
+        cleanup();
+      });
 
-        upstreamWs.on("close", () => {
-          try { downstreamWs.close(1000); } catch { /* ignore */ }
-          cleanup();
-        });
+      upstreamWs.on("close", () => {
+        try { downstreamWs.close(1000); } catch { /* ignore */ }
+        cleanup();
+      });
 
-        upstreamWs.on("error", (err) => {
-          console.error(`Upstream WS error (session=${sessionId}):`, err.message);
-          try { downstreamWs.close(1000); } catch { /* ignore */ }
-          cleanup();
-        });
+      upstreamWs.on("error", (err) => {
+        console.error(`Upstream WS error (session=${sessionId}):`, err.message);
+        try { downstreamWs.close(1000); } catch { /* ignore */ }
+        cleanup();
       });
     });
   } catch (err) {

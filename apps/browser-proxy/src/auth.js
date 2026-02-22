@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 
 const TOKEN_CACHE_PREFIX = "browser-auth:";
-const TOKEN_CACHE_TTL = 300;
+const TOKEN_CACHE_TTL = 3600; // 1 hour — tokens are machine-generated, rarely change
 
 /**
  * Validate a proxy token. Returns { customer_id, box_id } or null.

@@ -7,7 +7,9 @@
  * @returns {object|object[]} — data with rewritten URLs
  */
 export function rewriteUrls(data, proxyHost) {
-  const protocol = proxyHost.startsWith("localhost") ? "ws" : "wss";
+  // Always use plain ws:// — the proxy itself does not terminate TLS.
+  // A TLS-terminating reverse proxy in front would handle wss:// externally.
+  const protocol = "ws";
 
   if (Array.isArray(data)) {
     return data.map((entry) => rewriteEntry(entry, proxyHost, protocol));

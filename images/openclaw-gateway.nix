@@ -179,11 +179,11 @@ Available providers: github, google, slack, linear, notion, jira
 EOAGENTS
     fi
 
-    # Browser proxy config — embed proxy token as Basic auth in the URL
+    # Browser proxy config — pass proxy token as query param to avoid
+    # Node.js fetch() rejecting URLs with embedded credentials
     BROWSER_PROXY_RAW="''${OPENCLAW_BROWSER_PROXY_URL:-}"
     if [ -n "$BROWSER_PROXY_RAW" ] && [ -n "$API_KEY" ]; then
-      # Insert token as username: http://TOKEN@host:port
-      BROWSER_PROXY_URL=$(printf '%s' "$BROWSER_PROXY_RAW" | sed "s|://|://$API_KEY@|")
+      BROWSER_PROXY_URL="''${BROWSER_PROXY_RAW}?token=$API_KEY"
     else
       BROWSER_PROXY_URL="$BROWSER_PROXY_RAW"
     fi
@@ -222,6 +222,8 @@ EOAGENTS
           .browser = {
             enabled: true,
             defaultProfile: "cloud",
+            remoteCdpTimeoutMs: 5000,
+            remoteCdpHandshakeTimeoutMs: 10000,
             profiles: {
               cloud: { cdpUrl: $browser_proxy, color: "#00AA00" }
             }
