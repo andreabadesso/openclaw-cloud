@@ -38,7 +38,7 @@ $SYSTEM_PROMPT
 EOCLAUDE
     fi
 
-    # Generate AGENTS.md and mcporter.json from OPENCLAW_CONNECTIONS if set
+    # Generate AGENTS.md from OPENCLAW_CONNECTIONS
     WORKSPACE_DIR="/root/workspace"
     mkdir -p "$WORKSPACE_DIR"
     CONNECTIONS_JSON="''${OPENCLAW_CONNECTIONS:-}"
@@ -50,9 +50,9 @@ EOCLAUDE
       NANGO_PROXY_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_proxy_url')
       NANGO_SECRET_KEY=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_secret_key')
 
-      # Process connections: native providers get env vars, MCP providers get mcporter config
+      # Process connections at startup: native providers need env vars set before
+      # the process starts, MCP providers need mcporter config written to disk.
       MCPORTER_SERVERS="{}"
-      CONNECTED_LIST=""
 
       for row in $(printf '%s' "$CONNECTIONS_JSON" | jq -c '.connections[]'); do
         CONN_PROVIDER=$(printf '%s' "$row" | jq -r '.provider')
@@ -66,25 +66,17 @@ EOCLAUDE
         ACCESS_TOKEN=$(printf '%s' "$TOKEN_RESP" | jq -r '.credentials.access_token // .credentials.api_key // empty' 2>/dev/null || true)
 
         if [ -z "$ACCESS_TOKEN" ]; then
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER** (token fetch failed)"
           continue
         fi
 
-        # --- Native provider: inject as env var for openclaw's built-in tools ---
+        # Native provider: inject as env var for openclaw's built-in tools
         if [ -n "$NATIVE_ENV" ]; then
           export "$NATIVE_ENV=$ACCESS_TOKEN"
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER**: native openclaw integration (use built-in tools)"
           continue
         fi
 
-        # --- MCP provider: build mcporter config ---
-        if [ -z "$MCP_META" ]; then
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER** (no integration configured)"
-          continue
-        fi
+        # MCP provider: build mcporter config
+        if [ -z "$MCP_META" ]; then continue; fi
 
         MCP_TYPE=$(printf '%s' "$MCP_META" | jq -r '.type')
         if [ "$MCP_TYPE" = "http" ]; then
@@ -106,9 +98,6 @@ EOCLAUDE
             --arg tok "$ACCESS_TOKEN" \
             '. + {($p): {command: $cmd, args: $args, env: {($te): $tok}}}')
         fi
-
-        CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER**: \`mcporter call $CONN_PROVIDER.<tool> <args>\`"
       done
 
       # Write mcporter config (only if there are MCP servers)
@@ -118,64 +107,54 @@ EOCLAUDE
         npx mcporter@latest --version >/dev/null 2>&1 || true
       fi
 
+      # Write AGENTS.md — agent discovers connections dynamically via API
       cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
 # External Service Connections
 
-You have access to external services through native openclaw tools and MCP servers.
+You can connect to external services (GitHub, Google Drive, Slack, Linear, Notion, Jira) on behalf of the user.
 
-## Connected Services
-$CONNECTED_LIST
+## IMPORTANT: Always check connections first
 
-## Native Integrations (GitHub, Notion, Slack)
-
-These work through openclaw's built-in tools and skills — no special commands needed.
-
-- **GitHub**: Use the \`github\` skill (\`gh\` CLI). Examples: \`gh issue list\`, \`gh pr create\`, \`gh repo view\`
-- **Notion**: Use the \`notion\` skill. Examples: search pages, read databases, create pages
-- **Slack**: Use the built-in Slack actions tool for messaging, reactions, and channel management
-
-## MCP Integrations (Linear, Jira, Google)
-
-These require \`mcporter\` via the \`exec\` tool.
-
-List available tools:
-\`\`\`
-mcporter list <server> --schema
-\`\`\`
-
-Call a tool:
-\`\`\`
-mcporter call <server>.<tool> <args> --output json
-\`\`\`
-
-### Examples
+Before telling the user you cannot access a service, **always** check what connections are available by running:
 
 \`\`\`bash
-# Linear
-mcporter call linear.list_issues --output json
-mcporter call linear.get_issue id:ENG-123 --output json
-
-# Jira
-mcporter call jira.search_issues jql:"project = PROJ" --output json
-
-# Google Drive
-mcporter call google.search_files query:"quarterly report" --output json
+curl -s "$AGENT_API_URL/internal/agent/connections" \\
+  -H "Authorization: Bearer $AGENT_API_SECRET" \\
+  -H "X-Customer-Id: $AGENT_CUSTOMER_ID"
 \`\`\`
 
-## Requesting New Connections
+This returns:
+- \`connections\`: currently connected services with usage instructions
+- \`available_providers\`: services the user can connect but hasn't yet
 
-If the user asks for a service that is not connected:
+## Requesting a New Connection
 
-\`\`\`
+If the user asks for a service that is NOT in \`connections\`, generate a connect link:
+
+\`\`\`bash
 curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" \\
   -H "Authorization: Bearer $AGENT_API_SECRET" \\
   -H "Content-Type: application/json" \\
   -d '{"customer_id":"$AGENT_CUSTOMER_ID","provider":"<provider_name>"}'
 \`\`\`
 
-This returns a URL. Send it to the user so they can complete OAuth in their browser.
+This returns a \`url\`. Send it to the user so they can authorize the service in their browser.
+After they complete OAuth, check connections again — the service will appear in \`connections\`.
 
-Available providers: github, google, slack, linear, notion, jira
+## Using Connected Services
+
+The connections API response tells you how to use each provider. In general:
+
+- **Native providers** (GitHub, Notion, Slack): Use openclaw's built-in tools directly — no special commands needed.
+- **MCP providers** (Linear, Jira, Google): Use \`mcporter\` via exec:
+  \`\`\`bash
+  mcporter list <provider> --schema        # list available tools
+  mcporter call <provider>.<tool> <args> --output json  # call a tool
+  \`\`\`
+
+## Available Providers
+
+github, google, slack, linear, notion, jira
 EOAGENTS
     fi
 
