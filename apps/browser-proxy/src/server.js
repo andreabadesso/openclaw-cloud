@@ -309,13 +309,18 @@ function buildUpstreamHttpUrl(path) {
 
 /**
  * Build the upstream WebSocket URL.
- * Converts http(s) to ws(s), appends path, preserves token query param.
+ * Converts http(s) to ws(s), preserves token query param.
+ *
+ * Browserless v2 (managed) expects CDP connections on the root path ("/"),
+ * not on /devtools/browser/<id> paths (which are Chrome-native endpoints).
+ * We strip the downstream path and always connect to the Browserless root.
  */
 function buildUpstreamWsUrl(path) {
   const base = new URL(config.browserlessUrl);
   base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
-  const upstream = new URL(path, base);
-  // Preserve the token from BROWSERLESS_URL
+  // Connect to Browserless root — it spawns a fresh browser per WS connection
+  const upstream = new URL("/", base);
+  // Preserve the token (and any other params) from BROWSERLESS_URL
   for (const [key, value] of base.searchParams) {
     upstream.searchParams.set(key, value);
   }

@@ -18,13 +18,14 @@ in {
     deployments.browser-proxy = {
       metadata = { name = "browser-proxy"; namespace = "platform"; };
       spec = {
-        replicas = 2;
+        replicas = 1;
         selector.matchLabels.app = "browser-proxy";
         template = {
           metadata.labels.app = "browser-proxy";
           spec = {
             containers.browser-proxy = {
               inherit image;
+              imagePullPolicy = "IfNotPresent";
               env = commonEnv;
               ports = [{ containerPort = 9223; protocol = "TCP"; }];
               resources = {
