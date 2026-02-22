@@ -1,3 +1,4 @@
+import json
 import logging
 
 from kubernetes import client, config
@@ -123,6 +124,15 @@ def create_config_secret(
         "OPENCLAW_THINKING": thinking,
         "NODE_OPTIONS": "--max-old-space-size=896",
         "OPENCLAW_BROWSER_PROXY_URL": settings.browser_proxy_url,
+        "OPENCLAW_CONNECTIONS": json.dumps({
+            "nango_proxy_url": settings.nango_server_url,
+            "nango_secret_key": settings.nango_secret_key,
+            "api_url": settings.api_url,
+            "api_secret": settings.agent_api_secret,
+            "customer_id": customer_id,
+            "web_url": settings.web_url,
+            "connections": [],
+        }),
     }
     if system_prompt:
         data["OPENCLAW_SYSTEM_PROMPT"] = system_prompt
