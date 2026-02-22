@@ -50,6 +50,7 @@ graph TB
       api["API<br/><small>FastAPI</small>"]
       operator["Operator"]
       proxy["Token Proxy"]
+      bproxy["Browser Proxy"]
       billing["Billing Worker"]
       nango["Nango<br/><small>OAuth</small>"]
       pg[("Postgres")]
@@ -73,6 +74,7 @@ graph TB
     end
 
     gw1 -- "LLM calls<br/>(proxied)" --> proxy
+    gw1 -- "browser<br/>(CDP)" --> bproxy
     gw1 -- "native tools<br/>(env vars)" --> nango
     gw1 -- "MCP tools<br/>(mcporter)" --> nango
     operator -- "provisions" --> c1
@@ -81,6 +83,7 @@ graph TB
 
   billing -- "webhooks" --- stripe(("Stripe"))
   proxy -- "Kimi API" --> moonshot(("Moonshot"))
+  bproxy -- "CDP/WSS" --> browserless(("Browserless"))
   nango -- "OAuth tokens" --> providers(("GitHub, Linear,<br/>Slack, Google, ..."))
 ```
 
@@ -92,6 +95,7 @@ graph TB
 | **operator** | Python + Redis BLPOP | Job queue consumer — creates/manages K8s resources per customer |
 | **billing-worker** | FastAPI + Stripe | Stripe webhook processor — handles checkout, payments, tier changes, cancellations |
 | **token-proxy** | Node.js + pi-ai | Transparent LLM proxy — per-customer auth, rate limits, token quotas, usage metering |
+| **browser-proxy** | Node.js + ws | CDP proxy to Browserless — per-customer browser sessions with auth, concurrency limits, usage tracking |
 | **web** | Next.js 14 + Tailwind + next-intl | Landing page (niche marketplace), onboarding, customer dashboard, OAuth flows, admin panel |
 | **nango-server** | Nango (self-hosted) | OAuth lifecycle — token storage, automatic refresh, encrypted credentials, proxy |
 | **postgres** | PostgreSQL | All persistent data |
@@ -101,10 +105,10 @@ graph TB
 
 Every customer gets their own K8s namespace containing:
 
-- **openclaw-gateway** pod — the AI agent (Telegram bot + LLM + native tools + MCP tools + niche system prompt)
-- **openclaw-config** Secret — bot token, proxy API key, model config, connection credentials, system prompt
+- **openclaw-gateway** pod — the AI agent (Telegram bot + LLM + native tools + MCP tools + browser + niche system prompt)
+- **openclaw-config** Secret — bot token, proxy API key, model config, connection credentials, browser proxy URL, system prompt
 - **ResourceQuota** — CPU/memory limits enforced per tier
-- **NetworkPolicy** — egress restricted to token-proxy, nango-server, and Telegram only
+- **NetworkPolicy** — egress restricted to token-proxy, browser-proxy, nango-server, API, and Telegram only
 
 ## External service integrations
 
@@ -139,6 +143,19 @@ Customer pods never hold real LLM API keys. All inference calls go through the t
 - Proxies to the upstream LLM provider (Moonshot/Kimi)
 - Meters usage per-request (Redis stream → batch Postgres writes)
 
+## Browser proxy
+
+Every agent pod can browse the web through a shared [Browserless](https://browserless.io) instance, proxied through the browser-proxy service. The architecture mirrors the token proxy:
+
+- Agent pods never hold the Browserless API key
+- The proxy authenticates pods using their existing proxy token (embedded as Basic auth in the CDP URL)
+- HTTP `/json/*` discovery requests are forwarded with URL rewriting (WebSocket URLs point back through the proxy)
+- WebSocket CDP connections are piped bidirectionally between the pod and Browserless
+- Per-customer session limits (max 2 concurrent) and max duration (10 min) are enforced
+- Session usage is tracked in Postgres (`browser_sessions` table)
+
+The gateway reads `OPENCLAW_BROWSER_PROXY_URL` from its environment and configures a `cloud` browser profile automatically.
+
 ## Billing
 
 Stripe handles all payment processing. The billing flow is fully automated:
@@ -170,6 +187,7 @@ Stripe handles all payment processing. The billing flow is fully automated:
 | **API** | FastAPI + SQLAlchemy (async) + Pydantic |
 | **Frontend** | Next.js 14 + Tailwind CSS + shadcn/ui + next-intl (PT-BR default, EN) |
 | **LLM proxy** | Node.js + pi-ai (provider abstraction) |
+| **Browser proxy** | Node.js + ws (CDP WebSocket proxy to Browserless) |
 | **Billing** | Stripe (webhooks → billing-worker) |
 | **OAuth** | Nango (self-hosted) |
 | **MCP tooling** | mcporter (Linear, Jira, Google) + native openclaw tools (GitHub, Notion, Slack) |
@@ -179,7 +197,7 @@ Stripe handles all payment processing. The billing flow is fully automated:
 
 ## Testing
 
-242 tests across all services, run in CI on every push:
+255 tests across all services, run in CI on every push:
 
 ```bash
 # API (68 tests) — SQLite in-memory, full route coverage
@@ -193,6 +211,9 @@ cd apps/billing-worker && pip install -e ".[dev]" && pytest
 
 # Token Proxy (66 tests) — streaming + non-streaming proxy, context conversion
 cd apps/token-proxy && npm ci && npm test
+
+# Browser Proxy (13 tests) — WS proxy, URL rewriting, auth, session limits
+cd apps/browser-proxy && npm ci && npm test
 ```
 
 ## Local development
@@ -255,6 +276,7 @@ apps/
   operator/             # Python — K8s resource manager (with niches.py)
   billing-worker/       # FastAPI — Stripe webhook processor
   token-proxy/          # Node.js — LLM proxy with auth + metering
+  browser-proxy/        # Node.js — CDP proxy to Browserless with auth + session tracking
   web/                  # Next.js — frontend (i18n: pt/en)
     messages/           # Translation files (pt.json, en.json)
     src/i18n/           # next-intl routing, request config, navigation
@@ -284,6 +306,7 @@ docs/                   # Technical design documents
 - [x] Stripe billing integration (billing-worker + webhook handlers)
 - [x] CI pipeline (GitHub Actions — tests + Docker builds)
 - [x] All services in-cluster (k3d local, K3s prod)
+- [x] Browser access via CDP proxy to Browserless
 - [x] Niche agent marketplace (pharmacy first)
 - [x] i18n (Portuguese BR default, English)
 - [x] Niche system prompt injection into gateway pods
