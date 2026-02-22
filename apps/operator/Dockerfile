@@ -3,10 +3,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install operator service
-COPY apps/operator/pyproject.toml .
+COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
-COPY apps/operator/openclaw_operator/ openclaw_operator/
+COPY openclaw_operator/ openclaw_operator/
 
 EXPOSE 8081
 

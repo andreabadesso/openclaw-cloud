@@ -71,12 +71,12 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: apps/token-proxy/package.json
+          cache-dependency-path: apps/token-proxy/package-lock.json
       - run: npm ci
       - run: npm test
 
-  web-lint:
-    name: Web Lint
+  web-typecheck:
+    name: Web Typecheck
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -87,7 +87,7 @@ jobs:
         with:
           node-version: "20"
       - run: npm install
-      - run: npm run lint
+      - run: npx tsc --noEmit
 
   docker-build:
     name: Docker Build (${{ matrix.service }})
