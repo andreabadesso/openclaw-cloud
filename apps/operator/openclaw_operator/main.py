@@ -24,6 +24,7 @@ from .jobs.suspend import handle_suspend
 from .jobs.update import handle_update
 from .jobs.update_connections import handle_update_connections
 from .k8s import init_k8s
+from .metrics import metrics_loop
 
 logging.basicConfig(
     level=logging.INFO,
@@ -183,10 +184,15 @@ async def job_loop() -> None:
     _healthy = True
     logger.info("Operator started, listening on queue: %s", settings.job_queue)
 
+    loop = asyncio.get_running_loop()
     while not _shutdown_event.is_set():
         try:
-            # BLPOP with 1s timeout so we can check for shutdown
-            result = r.blpop(settings.job_queue, timeout=1)
+            # BLPOP with 1s timeout so we can check for shutdown.
+            # Run in executor to avoid blocking the event loop (other async
+            # tasks like metrics_loop need to run concurrently).
+            result = await loop.run_in_executor(
+                None, lambda: r.blpop(settings.job_queue, timeout=1)
+            )
             if result is None:
                 continue
             _, raw = result
@@ -211,16 +217,19 @@ async def health(request: Request) -> JSONResponse:
 
 @asynccontextmanager
 async def lifespan(app: Starlette):
-    # Start the job loop as a background task
+    # Start the job loop and metrics collector as background tasks
     init_k8s()
-    task = asyncio.create_task(job_loop())
+    job_task = asyncio.create_task(job_loop())
+    metrics_task = asyncio.create_task(metrics_loop(get_session_factory()))
     yield
     _shutdown_event.set()
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    job_task.cancel()
+    metrics_task.cancel()
+    for t in (job_task, metrics_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 app = Starlette(

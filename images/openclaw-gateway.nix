@@ -30,17 +30,15 @@ let
     # Build allowFrom JSON array from comma-separated string
     ALLOW_JSON=$(printf '%s' "$ALLOW_FROM" | jq -R 'split(",") | map(select(. != "") | tonumber)')
 
+    # Generate AGENTS.md from OPENCLAW_CONNECTIONS
+    WORKSPACE_DIR="/root/workspace"
+    mkdir -p "$WORKSPACE_DIR"
+
     # Write system prompt as CLAUDE.md if OPENCLAW_SYSTEM_PROMPT is set
     SYSTEM_PROMPT="''${OPENCLAW_SYSTEM_PROMPT:-}"
     if [ -n "$SYSTEM_PROMPT" ]; then
-      cat > "$WORKSPACE_DIR/CLAUDE.md" << EOCLAUDE
-$SYSTEM_PROMPT
-EOCLAUDE
+      printf '%s\n' "$SYSTEM_PROMPT" > "$WORKSPACE_DIR/CLAUDE.md"
     fi
-
-    # Generate AGENTS.md and mcporter.json from OPENCLAW_CONNECTIONS if set
-    WORKSPACE_DIR="/root/workspace"
-    mkdir -p "$WORKSPACE_DIR"
     CONNECTIONS_JSON="''${OPENCLAW_CONNECTIONS:-}"
     if [ -n "$CONNECTIONS_JSON" ]; then
       AGENT_API_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.api_url')
@@ -50,9 +48,9 @@ EOCLAUDE
       NANGO_PROXY_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_proxy_url')
       NANGO_SECRET_KEY=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_secret_key')
 
-      # Process connections: native providers get env vars, MCP providers get mcporter config
+      # Process connections at startup: native providers need env vars set before
+      # the process starts, MCP providers need mcporter config written to disk.
       MCPORTER_SERVERS="{}"
-      CONNECTED_LIST=""
 
       for row in $(printf '%s' "$CONNECTIONS_JSON" | jq -c '.connections[]'); do
         CONN_PROVIDER=$(printf '%s' "$row" | jq -r '.provider')
@@ -66,25 +64,17 @@ EOCLAUDE
         ACCESS_TOKEN=$(printf '%s' "$TOKEN_RESP" | jq -r '.credentials.access_token // .credentials.api_key // empty' 2>/dev/null || true)
 
         if [ -z "$ACCESS_TOKEN" ]; then
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER** (token fetch failed)"
           continue
         fi
 
-        # --- Native provider: inject as env var for openclaw's built-in tools ---
+        # Native provider: inject as env var for openclaw's built-in tools
         if [ -n "$NATIVE_ENV" ]; then
           export "$NATIVE_ENV=$ACCESS_TOKEN"
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER**: native openclaw integration (use built-in tools)"
           continue
         fi
 
-        # --- MCP provider: build mcporter config ---
-        if [ -z "$MCP_META" ]; then
-          CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER** (no integration configured)"
-          continue
-        fi
+        # MCP provider: build mcporter config
+        if [ -z "$MCP_META" ]; then continue; fi
 
         MCP_TYPE=$(printf '%s' "$MCP_META" | jq -r '.type')
         if [ "$MCP_TYPE" = "http" ]; then
@@ -106,9 +96,6 @@ EOCLAUDE
             --arg tok "$ACCESS_TOKEN" \
             '. + {($p): {command: $cmd, args: $args, env: {($te): $tok}}}')
         fi
-
-        CONNECTED_LIST="$CONNECTED_LIST
-- **$CONN_PROVIDER**: \`mcporter call $CONN_PROVIDER.<tool> <args>\`"
       done
 
       # Write mcporter config (only if there are MCP servers)
@@ -118,65 +105,46 @@ EOCLAUDE
         npx mcporter@latest --version >/dev/null 2>&1 || true
       fi
 
-      cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
-# External Service Connections
+      # Write SOUL.md — persona and critical behavioral rules (gets special priority)
+      cat > "$WORKSPACE_DIR/SOUL.md" << 'EOSOUL'
+You are a helpful assistant with access to external services.
 
-You have access to external services through native openclaw tools and MCP servers.
+CRITICAL INSTRUCTION - READ CAREFULLY:
+When the user asks about Google Drive, GitHub, Slack, Linear, Notion, Jira, or any external service:
+1. Do NOT use sessions_spawn
+2. Do NOT use agents_list
+3. Do NOT say you don't have access
+4. Instead, use the "exec" tool to run a curl command (see TOOLS.md for the exact command)
+EOSOUL
 
-## Connected Services
-$CONNECTED_LIST
+      # Write TOOLS.md — the actual curl commands
+      cat > "$WORKSPACE_DIR/TOOLS.md" << EOTOOLS
+# How to access external services
 
-## Native Integrations (GitHub, Notion, Slack)
+Use the exec tool to run these curl commands. Replace PROVIDER_NAME with: google, github, slack, linear, notion, or jira.
 
-These work through openclaw's built-in tools and skills — no special commands needed.
+## Check available connections
+exec curl -s "$AGENT_API_URL/internal/agent/connections" -H "Authorization: Bearer $AGENT_API_SECRET" -H "X-Customer-Id: $AGENT_CUSTOMER_ID"
 
-- **GitHub**: Use the \`github\` skill (\`gh\` CLI). Examples: \`gh issue list\`, \`gh pr create\`, \`gh repo view\`
-- **Notion**: Use the \`notion\` skill. Examples: search pages, read databases, create pages
-- **Slack**: Use the built-in Slack actions tool for messaging, reactions, and channel management
+## Request a new connection (if not connected yet)
+exec curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" -H "Authorization: Bearer $AGENT_API_SECRET" -H "Content-Type: application/json" -d '{"customer_id":"$AGENT_CUSTOMER_ID","provider":"PROVIDER_NAME"}'
 
-## MCP Integrations (Linear, Jira, Google)
+Send the returned URL to the user so they can authorize the service.
+EOTOOLS
 
-These require \`mcporter\` via the \`exec\` tool.
+      # Write IDENTITY.md — reinforce the rule
+      cat > "$WORKSPACE_DIR/IDENTITY.md" << 'EOIDENTITY'
+IMPORTANT: You have access to external services (Google Drive, GitHub, etc.) through the exec tool and curl commands described in TOOLS.md. Always check TOOLS.md before saying you cannot access a service. Never use sessions_spawn or agents_list for external services.
+EOIDENTITY
+    fi
 
-List available tools:
-\`\`\`
-mcporter list <server> --schema
-\`\`\`
-
-Call a tool:
-\`\`\`
-mcporter call <server>.<tool> <args> --output json
-\`\`\`
-
-### Examples
-
-\`\`\`bash
-# Linear
-mcporter call linear.list_issues --output json
-mcporter call linear.get_issue id:ENG-123 --output json
-
-# Jira
-mcporter call jira.search_issues jql:"project = PROJ" --output json
-
-# Google Drive
-mcporter call google.search_files query:"quarterly report" --output json
-\`\`\`
-
-## Requesting New Connections
-
-If the user asks for a service that is not connected:
-
-\`\`\`
-curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" \\
-  -H "Authorization: Bearer $AGENT_API_SECRET" \\
-  -H "Content-Type: application/json" \\
-  -d '{"customer_id":"$AGENT_CUSTOMER_ID","provider":"<provider_name>"}'
-\`\`\`
-
-This returns a URL. Send it to the user so they can complete OAuth in their browser.
-
-Available providers: github, google, slack, linear, notion, jira
-EOAGENTS
+    # Browser proxy config — pass proxy token as query param to avoid
+    # Node.js fetch() rejecting URLs with embedded credentials
+    BROWSER_PROXY_RAW="''${OPENCLAW_BROWSER_PROXY_URL:-}"
+    if [ -n "$BROWSER_PROXY_RAW" ] && [ -n "$API_KEY" ]; then
+      BROWSER_PROXY_URL="''${BROWSER_PROXY_RAW}?token=$API_KEY"
+    else
+      BROWSER_PROXY_URL="$BROWSER_PROXY_RAW"
     fi
 
     # Build openclaw config JSON using jq (avoids heredoc quoting issues)
@@ -189,6 +157,7 @@ EOAGENTS
       --arg workspace "$WORKSPACE_DIR" \
       --arg api_key "$API_KEY" \
       --arg base_url "$BASE_URL" \
+      --arg browser_proxy "$BROWSER_PROXY_URL" \
       --argjson allow_from "$ALLOW_JSON" \
       '{
         commands: { native: "auto", nativeSkills: "auto", restart: true },
@@ -208,6 +177,17 @@ EOAGENTS
           telegram: { tokenFile: $token_file, allowFrom: $allow_from }
         }
       }
+      | if $browser_proxy != "" then
+          .browser = {
+            enabled: true,
+            defaultProfile: "cloud",
+            remoteCdpTimeoutMs: 5000,
+            remoteCdpHandshakeTimeoutMs: 10000,
+            profiles: {
+              cloud: { cdpUrl: $browser_proxy, color: "#00AA00" }
+            }
+          }
+        else . end
       | if $base_url != "" then
           .models = {
             mode: "merge",

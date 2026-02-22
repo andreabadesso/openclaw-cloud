@@ -88,7 +88,13 @@ export default function DashboardPage() {
         </dl>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 flex gap-3">
+        <a
+          href="/dashboard/analytics"
+          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          View Analytics
+        </a>
         <a
           href="/billing"
           className="inline-flex items-center rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"

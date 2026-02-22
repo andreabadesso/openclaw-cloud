@@ -16,6 +16,7 @@
     ./services/operator.nix
     ./services/onboarding-agent.nix
     ./services/billing-worker.nix
+    ./services/browser-proxy.nix
   ];
 
   kubernetes.version = "1.31";

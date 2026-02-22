@@ -55,7 +55,7 @@ function openAiToContext(reqBody) {
   }
 
   for (const msg of reqBody.messages || []) {
-    if (msg.role === "system") {
+    if (msg.role === "system" || msg.role === "developer") {
       const text = typeof msg.content === "string" ? msg.content : msg.content?.map((b) => b.text || "").join("");
       ctx.systemPrompt = ctx.systemPrompt ? ctx.systemPrompt + "\n" + text : text;
       continue;

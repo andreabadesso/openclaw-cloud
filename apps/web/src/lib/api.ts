@@ -1,7 +1,7 @@
 const API_URL = "/api";
 
 // TODO: Replace with real JWT auth
-const DEV_CUSTOMER_ID = "b542035c-93c5-4901-bea7-d3b5037a6288";
+const DEV_CUSTOMER_ID = "640a8328-dda2-4a48-a057-edfd93931667";
 
 async function request<T>(
   path: string,
@@ -64,6 +64,28 @@ export interface ConnectSession {
   connect_url: string;
 }
 
+export interface PodMetricsPoint {
+  cpu_millicores: number;
+  memory_bytes: number;
+  ts: string;
+}
+
+export interface AnalyticsData {
+  token_usage: {
+    tokens_used: number;
+    tokens_limit: number;
+    period_start: string | null;
+    period_end: string | null;
+  };
+  browser_sessions: {
+    session_count: number;
+    total_duration_ms: number;
+  };
+  pod_metrics_latest: PodMetricsPoint | null;
+  pod_metrics_series: PodMetricsPoint[];
+  tier: string;
+}
+
 export const api = {
   getBox: (id: string): Promise<Box> =>
     request<Box>(`/me/box`),
@@ -108,4 +130,7 @@ export const api = {
     request<ConnectSession>(`/me/connections/${id}/reconnect`, {
       method: "POST",
     }),
+
+  getAnalytics: (hours = 24) =>
+    request<AnalyticsData>(`/me/analytics?hours=${hours}`),
 };

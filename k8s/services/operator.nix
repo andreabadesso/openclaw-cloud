@@ -49,6 +49,7 @@ in {
         { apiGroups = [ "" ];       resources = [ "namespaces" "secrets" "pods" "resourcequotas" ]; verbs = [ "create" "get" "list" "delete" "patch" ]; }
         { apiGroups = [ "apps" ];   resources = [ "deployments" ];               verbs = [ "create" "get" "list" "update" "delete" "patch" ]; }
         { apiGroups = [ "networking.k8s.io" ]; resources = [ "networkpolicies" ]; verbs = [ "create" "get" "list" "delete" "patch" ]; }
+        { apiGroups = [ "metrics.k8s.io" ];    resources = [ "pods" ];           verbs = [ "get" "list" ]; }
       ];
     };
 

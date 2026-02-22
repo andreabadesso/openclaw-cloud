@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     agent_api_secret: str = Field(default="")
     api_url: str = Field(default="http://api.platform.svc.cluster.local:8000")
     web_url: str = Field(default="http://localhost:3000")
+    browser_proxy_url: str = Field(default="http://browser-proxy.platform.svc.cluster.local:9223")
 
     model_config = {"env_prefix": "", "case_sensitive": False, "extra": "ignore"}
 
