@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..k8s import patch_config_secret, rollout_restart, wait_for_rollout
+from ..providers import MCP_SERVERS
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,11 @@ async def handle_update_connections(payload: dict, customer_id: str, db: AsyncSe
         "customer_id": customer_id,
         "web_url": settings.web_url,
         "connections": [
-            {"provider": r.provider, "connection_id": r.nango_connection_id}
+            {
+                "provider": r.provider,
+                "connection_id": r.nango_connection_id,
+                "mcp": MCP_SERVERS.get(r.provider),
+            }
             for r in rows
         ],
     })

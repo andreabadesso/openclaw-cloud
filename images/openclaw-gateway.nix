@@ -30,7 +30,7 @@ let
     # Build allowFrom JSON array from comma-separated string
     ALLOW_JSON=$(printf '%s' "$ALLOW_FROM" | jq -R 'split(",") | map(select(. != "") | tonumber)')
 
-    # Generate AGENTS.md from OPENCLAW_CONNECTIONS if set
+    # Generate AGENTS.md and mcporter.json from OPENCLAW_CONNECTIONS if set
     WORKSPACE_DIR="/root/workspace"
     mkdir -p "$WORKSPACE_DIR"
     CONNECTIONS_JSON="''${OPENCLAW_CONNECTIONS:-}"
@@ -41,50 +41,109 @@ let
 
       NANGO_PROXY_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_proxy_url')
       NANGO_SECRET_KEY=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.nango_secret_key')
-      CONN_LIST=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.connections[] | "- **\(.provider)**: connection_id=`\(.connection_id)`"')
+
+      # Build mcporter.json by fetching fresh tokens from Nango for each connection
+      MCPORTER_SERVERS="{}"
+      CONNECTED_LIST=""
+
+      for row in $(printf '%s' "$CONNECTIONS_JSON" | jq -c '.connections[]'); do
+        CONN_PROVIDER=$(printf '%s' "$row" | jq -r '.provider')
+        CONN_ID=$(printf '%s' "$row" | jq -r '.connection_id')
+        MCP_META=$(printf '%s' "$row" | jq -c '.mcp // empty')
+
+        if [ -z "$MCP_META" ]; then
+          CONNECTED_LIST="$CONNECTED_LIST
+- **$CONN_PROVIDER** (no MCP server configured — use curl via Nango proxy)"
+          continue
+        fi
+
+        # Fetch fresh token from Nango
+        TOKEN_RESP=$(curl -sf "$NANGO_PROXY_URL/connection/$CONN_ID?provider_config_key=$CONN_PROVIDER" \
+          -H "Authorization: Bearer $NANGO_SECRET_KEY" 2>/dev/null || true)
+        ACCESS_TOKEN=$(printf '%s' "$TOKEN_RESP" | jq -r '.credentials.access_token // .credentials.api_key // empty' 2>/dev/null || true)
+
+        if [ -z "$ACCESS_TOKEN" ]; then
+          CONNECTED_LIST="$CONNECTED_LIST
+- **$CONN_PROVIDER** (token fetch failed — use curl via Nango proxy)"
+          continue
+        fi
+
+        MCP_TYPE=$(printf '%s' "$MCP_META" | jq -r '.type')
+        if [ "$MCP_TYPE" = "http" ]; then
+          MCP_BASE_URL=$(printf '%s' "$MCP_META" | jq -r '.baseUrl')
+          MCPORTER_SERVERS=$(printf '%s' "$MCPORTER_SERVERS" | jq \
+            --arg p "$CONN_PROVIDER" \
+            --arg url "$MCP_BASE_URL" \
+            --arg tok "$ACCESS_TOKEN" \
+            '. + {($p): {baseUrl: $url, headers: {Authorization: ("Bearer " + $tok)}}}')
+        else
+          MCP_CMD=$(printf '%s' "$MCP_META" | jq -r '.command')
+          MCP_ARGS=$(printf '%s' "$MCP_META" | jq -c '.args')
+          MCP_TOKEN_ENV=$(printf '%s' "$MCP_META" | jq -r '.tokenEnv')
+          MCPORTER_SERVERS=$(printf '%s' "$MCPORTER_SERVERS" | jq \
+            --arg p "$CONN_PROVIDER" \
+            --arg cmd "$MCP_CMD" \
+            --argjson args "$MCP_ARGS" \
+            --arg te "$MCP_TOKEN_ENV" \
+            --arg tok "$ACCESS_TOKEN" \
+            '. + {($p): {command: $cmd, args: $args, env: {($te): $tok}}}')
+        fi
+
+        CONNECTED_LIST="$CONNECTED_LIST
+- **$CONN_PROVIDER**: \`mcporter call $CONN_PROVIDER.<tool> <args>\`"
+      done
+
+      # Write mcporter config
+      mkdir -p /root/.mcporter
+      printf '%s' "{\"mcpServers\": $MCPORTER_SERVERS, \"imports\": []}" > /root/.mcporter/mcporter.json
+
+      # Pre-cache mcporter
+      npx mcporter@latest --version >/dev/null 2>&1 || true
 
       cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
 # External Service Connections
 
-You have access to external services via an authenticated proxy. Use the \`exec\` tool to run \`curl\` commands.
+You have access to external services via MCP tools. Use the \`exec\` tool to call them with \`mcporter\`.
 
-**IMPORTANT**: The \`web_fetch\` tool does NOT support custom headers. You MUST use \`exec\` with \`curl\` for all proxy requests.
+**IMPORTANT**: Always use \`exec\` with \`mcporter\` — the \`web_fetch\` tool does NOT support custom headers.
 
 ## Connected Services
+$CONNECTED_LIST
 
-$CONN_LIST
+## How to Use
 
-## How to Make API Calls
-
-Use the \`exec\` tool to run curl commands against the Nango proxy at \`$NANGO_PROXY_URL/proxy\`.
-
-Required headers for every proxy request:
+List available tools for a service:
 \`\`\`
-Authorization: Bearer $NANGO_SECRET_KEY
-Connection-Id: <connection_id from the list above>
-Provider-Config-Key: <provider name>
+mcporter list <server> --schema
 \`\`\`
 
-### Google Drive Example
-
-List files:
+Call a tool:
 \`\`\`
-curl -s "$NANGO_PROXY_URL/proxy/drive/v3/files?pageSize=10" \\
-  -H "Authorization: Bearer $NANGO_SECRET_KEY" \\
-  -H "Connection-Id: <google_connection_id>" \\
-  -H "Provider-Config-Key: google"
+mcporter call <server>.<tool> <args> --output json
 \`\`\`
 
-### Google Sheets Example
+### Examples
 
-\`\`\`
-curl -s "$NANGO_PROXY_URL/proxy/v4/spreadsheets/<spreadsheet_id>" \\
-  -H "Authorization: Bearer $NANGO_SECRET_KEY" \\
-  -H "Connection-Id: <google_connection_id>" \\
-  -H "Provider-Config-Key: google"
+\`\`\`bash
+# Linear
+mcporter call linear.list_issues --output json
+mcporter call linear.get_issue id:ENG-123 --output json
+
+# GitHub
+mcporter call github.search_repos query:"openclaw language:typescript" --output json
+mcporter call github.list_pull_requests owner:myorg repo:myrepo --output json
+
+# Notion
+mcporter call notion.search query:"meeting notes" --output json
+
+# Slack
+mcporter call slack.post_message channel:"#general" text:"Hello from OpenClaw" --output json
+
+# Google Drive
+mcporter call google.search_files query:"quarterly report" --output json
 \`\`\`
 
-### Requesting New Connections
+## Requesting New Connections
 
 If the user asks for a service that is not connected:
 
@@ -164,7 +223,7 @@ in n2c.buildImage {
 
   copyToRoot = pkgs.buildEnv {
     name  = "root";
-    paths = [ caCerts pkgs.tzdata pkgs.coreutils pkgs.gnused pkgs.jq pkgs.curl pkgs.bash ];
+    paths = [ caCerts pkgs.tzdata pkgs.coreutils pkgs.gnused pkgs.jq pkgs.curl pkgs.bash pkgs.nodejs_20 ];
     pathsToLink = [ "/etc" "/share/zoneinfo" "/bin" ];
   };
 
