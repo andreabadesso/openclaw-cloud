@@ -132,8 +132,8 @@ describe("forwardRequest", () => {
         "content-type": "text/event-stream",
       }));
 
-      // Should have text chunk + final chunk + [DONE]
-      expect(res.write).toHaveBeenCalledTimes(4);
+      // Should have: text chunk, final chunk (stop + usage), [DONE]
+      expect(res.write).toHaveBeenCalledTimes(3);
       // First chunk has content delta
       const firstChunk = JSON.parse(res.write.mock.calls[0][0].replace("data: ", "").trim());
       expect(firstChunk.object).toBe("chat.completion.chunk");

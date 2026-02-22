@@ -277,8 +277,6 @@ class TestSubscriptionUpdated:
             "current_period_end": 1702592000,
         }
         event = make_stripe_event("customer.subscription.updated", sub_obj)
-        # Make the data.object support dict-style access
-        event.data.object = sub_obj
 
         mock_db.execute = AsyncMock(side_effect=[
             make_db_row("sub-id-1", "cust-001", "pro"),  # SELECT subscription
@@ -310,7 +308,6 @@ class TestSubscriptionUpdated:
             "current_period_end": 1702592000,
         }
         event = make_stripe_event("customer.subscription.updated", sub_obj)
-        event.data.object = sub_obj
 
         mock_db.execute = AsyncMock(side_effect=[
             make_db_row("sub-id-1", "cust-001", "pro"),  # SELECT subscription
@@ -331,7 +328,6 @@ class TestSubscriptionUpdated:
             "current_period_end": 1702592000,
         }
         event = make_stripe_event("customer.subscription.updated", sub_obj)
-        event.data.object = sub_obj
 
         mock_db.execute = AsyncMock(return_value=make_empty_result())
 

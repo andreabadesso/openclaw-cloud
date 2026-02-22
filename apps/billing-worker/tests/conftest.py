@@ -1,10 +1,28 @@
 import asyncio
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+
+
+class StripeObject(dict):
+    """Dict subclass that also supports attribute access, like real Stripe objects."""
+
+    def __init__(self, d):
+        super().__init__(d)
+        for k, v in d.items():
+            if isinstance(v, dict):
+                v = StripeObject(v)
+            elif isinstance(v, list):
+                v = [StripeObject(i) if isinstance(i, dict) else i for i in v]
+            self[k] = v
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name) from None
 
 
 @pytest.fixture(scope="session")
@@ -37,13 +55,8 @@ def make_stripe_event(event_type: str, data_object: dict, previous_attributes: d
     event.type = event_type
     event.id = "evt_test_123"
 
-    obj = SimpleNamespace(**data_object)
-    # Support dict-style metadata access
-    if "metadata" in data_object:
-        obj.metadata = data_object["metadata"]
-
     event.data = MagicMock()
-    event.data.object = obj
+    event.data.object = StripeObject(data_object)
 
     if previous_attributes:
         event.data.get = MagicMock(return_value=previous_attributes)

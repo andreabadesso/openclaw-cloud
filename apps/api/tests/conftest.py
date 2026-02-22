@@ -1,4 +1,6 @@
 import json
+import sqlite3
+import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,8 +9,11 @@ import pytest
 import pytest_asyncio
 import redis.asyncio as aioredis
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import StaticPool, event
+from sqlalchemy import JSON, StaticPool, String, Text, event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
+from sqlalchemy.types import TypeDecorator
 
 from openclaw_api.config import Settings
 from openclaw_api.deps import get_current_customer_id, get_db, get_redis
@@ -26,6 +31,68 @@ from openclaw_api.models import (
     UsageMonthly,
 )
 
+
+# --- SQLite compatibility ---
+# PostgreSQL-specific types must be compiled as SQLite-compatible equivalents.
+
+@compiles(PG_UUID, "sqlite")
+def _compile_uuid_sqlite(type_, compiler, **kw):
+    return "VARCHAR(36)"
+
+
+class JSONArray(TypeDecorator):
+    """Store Python lists as JSON strings in SQLite (replaces PG ARRAY)."""
+    impl = JSON
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+
+# Walk all model columns and swap PG-specific types for SQLite-compatible ones.
+for table in Base.metadata.tables.values():
+    for col in table.columns:
+        if isinstance(col.type, JSONB):
+            col.type = JSON()
+            # Fix PG-specific server_defaults: "'{}'" → "{}", "'[]'" → "[]"
+            if col.server_default is not None:
+                default_text = str(col.server_default.arg)
+                if default_text.startswith("'") and default_text.endswith("'"):
+                    col.server_default.arg = default_text[1:-1]
+        elif isinstance(col.type, ARRAY):
+            col.type = JSONArray()
+            if col.server_default is not None:
+                default_text = str(col.server_default.arg)
+                # PG array default "{}" → JSON "[]"
+                if default_text == "{}":
+                    col.server_default.arg = "[]"
+
+# Patch UUID primary key columns: replace server_default with Python-side default
+# so SQLite doesn't need INSERT...RETURNING to populate primary keys.
+from sqlalchemy.schema import ColumnDefault
+
+_uuid_default = ColumnDefault(lambda: str(uuid.uuid4()))
+
+for table in Base.metadata.tables.values():
+    for col in table.columns:
+        if col.primary_key and isinstance(col.type, PG_UUID):
+            col.server_default = None
+            col.default = _uuid_default
+
+# SQLite type adapters
+sqlite3.register_adapter(list, lambda val: json.dumps(val))
+sqlite3.register_adapter(dict, lambda val: json.dumps(val))
+
+
+# --- Test constants ---
+
 TEST_CUSTOMER_ID = "00000000-0000-0000-0000-000000000001"
 TEST_BOX_ID = "00000000-0000-0000-0000-000000000010"
 TEST_SUB_ID = "00000000-0000-0000-0000-000000000020"
@@ -38,10 +105,12 @@ engine = create_async_engine(
 
 
 @event.listens_for(engine.sync_engine, "connect")
-def _set_sqlite_pragma(dbapi_conn, _):
+def _set_sqlite_compat(dbapi_conn, _):
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=OFF")
     cursor.close()
+    dbapi_conn.create_function("gen_random_uuid", 0, lambda: str(uuid.uuid4()))
+    dbapi_conn.create_function("now", 0, lambda: datetime.now(timezone.utc).isoformat())
 
 
 test_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -61,11 +130,19 @@ async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-mock_redis = AsyncMock(spec=aioredis.Redis)
+mock_redis = AsyncMock()
+mock_redis.rpush = AsyncMock()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_redis():
+    """Reset the mock redis before each test so call counts are isolated."""
+    mock_redis.reset_mock()
+    mock_redis.rpush = AsyncMock()
+    yield
 
 
 async def override_get_redis() -> aioredis.Redis:
-    mock_redis.reset_mock()
     return mock_redis
 
 

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     api_url: str = Field(default="http://api.platform.svc.cluster.local:8000")
     web_url: str = Field(default="http://localhost:3000")
 
-    model_config = {"env_prefix": "", "case_sensitive": False}
+    model_config = {"env_prefix": "", "case_sensitive": False, "extra": "ignore"}
 
 
 settings = Settings()
