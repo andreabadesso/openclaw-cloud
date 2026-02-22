@@ -1,7 +1,7 @@
 const API_URL = "/api";
 
 // TODO: Replace with real JWT auth
-const DEV_CUSTOMER_ID = "b542035c-93c5-4901-bea7-d3b5037a6288";
+const DEV_CUSTOMER_ID = "640a8328-dda2-4a48-a057-edfd93931667";
 
 async function request<T>(
   path: string,

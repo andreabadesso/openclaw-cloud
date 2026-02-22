@@ -22,6 +22,7 @@ export async function forwardRequest(body, res, limitResult) {
   const context = openAiToContext(reqBody);
   const requestId = `chatcmpl-${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
 
+
   if (limitResult.warning) {
     res.setHeader("X-Token-Warning", "90%");
   }
@@ -42,8 +43,8 @@ function openAiToContext(reqBody) {
   const ctx = { messages: [] };
 
   for (const msg of reqBody.messages || []) {
-    if (msg.role === "system") {
-      // pi-ai uses systemPrompt for system messages
+    if (msg.role === "system" || msg.role === "developer") {
+      // pi-ai uses systemPrompt for system/developer messages
       const text = typeof msg.content === "string" ? msg.content : msg.content?.map((b) => b.text || "").join("");
       ctx.systemPrompt = ctx.systemPrompt ? ctx.systemPrompt + "\n" + text : text;
       continue;

@@ -30,17 +30,15 @@ let
     # Build allowFrom JSON array from comma-separated string
     ALLOW_JSON=$(printf '%s' "$ALLOW_FROM" | jq -R 'split(",") | map(select(. != "") | tonumber)')
 
-    # Write system prompt as CLAUDE.md if OPENCLAW_SYSTEM_PROMPT is set
-    SYSTEM_PROMPT="''${OPENCLAW_SYSTEM_PROMPT:-}"
-    if [ -n "$SYSTEM_PROMPT" ]; then
-      cat > "$WORKSPACE_DIR/CLAUDE.md" << EOCLAUDE
-$SYSTEM_PROMPT
-EOCLAUDE
-    fi
-
     # Generate AGENTS.md from OPENCLAW_CONNECTIONS
     WORKSPACE_DIR="/root/workspace"
     mkdir -p "$WORKSPACE_DIR"
+
+    # Write system prompt as CLAUDE.md if OPENCLAW_SYSTEM_PROMPT is set
+    SYSTEM_PROMPT="''${OPENCLAW_SYSTEM_PROMPT:-}"
+    if [ -n "$SYSTEM_PROMPT" ]; then
+      printf '%s\n' "$SYSTEM_PROMPT" > "$WORKSPACE_DIR/CLAUDE.md"
+    fi
     CONNECTIONS_JSON="''${OPENCLAW_CONNECTIONS:-}"
     if [ -n "$CONNECTIONS_JSON" ]; then
       AGENT_API_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.api_url')
@@ -107,55 +105,37 @@ EOCLAUDE
         npx mcporter@latest --version >/dev/null 2>&1 || true
       fi
 
-      # Write AGENTS.md — agent discovers connections dynamically via API
-      cat > "$WORKSPACE_DIR/AGENTS.md" << EOAGENTS
-# External Service Connections
+      # Write SOUL.md — persona and critical behavioral rules (gets special priority)
+      cat > "$WORKSPACE_DIR/SOUL.md" << 'EOSOUL'
+You are a helpful assistant with access to external services.
 
-You can connect to external services (GitHub, Google Drive, Slack, Linear, Notion, Jira) on behalf of the user.
+CRITICAL INSTRUCTION - READ CAREFULLY:
+When the user asks about Google Drive, GitHub, Slack, Linear, Notion, Jira, or any external service:
+1. Do NOT use sessions_spawn
+2. Do NOT use agents_list
+3. Do NOT say you don't have access
+4. Instead, use the "exec" tool to run a curl command (see TOOLS.md for the exact command)
+EOSOUL
 
-## IMPORTANT: Always check connections first
+      # Write TOOLS.md — the actual curl commands
+      cat > "$WORKSPACE_DIR/TOOLS.md" << EOTOOLS
+# How to access external services
 
-Before telling the user you cannot access a service, **always** check what connections are available by running:
+Use the exec tool to run these curl commands. Replace PROVIDER_NAME with: google, github, slack, linear, notion, or jira.
 
-\`\`\`bash
-curl -s "$AGENT_API_URL/internal/agent/connections" \\
-  -H "Authorization: Bearer $AGENT_API_SECRET" \\
-  -H "X-Customer-Id: $AGENT_CUSTOMER_ID"
-\`\`\`
+## Check available connections
+exec curl -s "$AGENT_API_URL/internal/agent/connections" -H "Authorization: Bearer $AGENT_API_SECRET" -H "X-Customer-Id: $AGENT_CUSTOMER_ID"
 
-This returns:
-- \`connections\`: currently connected services with usage instructions
-- \`available_providers\`: services the user can connect but hasn't yet
+## Request a new connection (if not connected yet)
+exec curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" -H "Authorization: Bearer $AGENT_API_SECRET" -H "Content-Type: application/json" -d '{"customer_id":"$AGENT_CUSTOMER_ID","provider":"PROVIDER_NAME"}'
 
-## Requesting a New Connection
+Send the returned URL to the user so they can authorize the service.
+EOTOOLS
 
-If the user asks for a service that is NOT in \`connections\`, generate a connect link:
-
-\`\`\`bash
-curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" \\
-  -H "Authorization: Bearer $AGENT_API_SECRET" \\
-  -H "Content-Type: application/json" \\
-  -d '{"customer_id":"$AGENT_CUSTOMER_ID","provider":"<provider_name>"}'
-\`\`\`
-
-This returns a \`url\`. Send it to the user so they can authorize the service in their browser.
-After they complete OAuth, check connections again — the service will appear in \`connections\`.
-
-## Using Connected Services
-
-The connections API response tells you how to use each provider. In general:
-
-- **Native providers** (GitHub, Notion, Slack): Use openclaw's built-in tools directly — no special commands needed.
-- **MCP providers** (Linear, Jira, Google): Use \`mcporter\` via exec:
-  \`\`\`bash
-  mcporter list <provider> --schema        # list available tools
-  mcporter call <provider>.<tool> <args> --output json  # call a tool
-  \`\`\`
-
-## Available Providers
-
-github, google, slack, linear, notion, jira
-EOAGENTS
+      # Write IDENTITY.md — reinforce the rule
+      cat > "$WORKSPACE_DIR/IDENTITY.md" << 'EOIDENTITY'
+IMPORTANT: You have access to external services (Google Drive, GitHub, etc.) through the exec tool and curl commands described in TOOLS.md. Always check TOOLS.md before saying you cannot access a service. Never use sessions_spawn or agents_list for external services.
+EOIDENTITY
     fi
 
     # Browser proxy config — pass proxy token as query param to avoid
