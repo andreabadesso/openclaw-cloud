@@ -32,6 +32,9 @@ export interface Box {
   model: string;
   thinking_level: string;
   language: string;
+  tier: string;
+  tokens_used: number;
+  tokens_limit: number;
   telegram_user_ids: number[];
   created_at: string;
   activated_at: string | null;
@@ -60,6 +63,9 @@ export interface ConnectSession {
 }
 
 export const api = {
+  getBox: (id: string): Promise<Box> =>
+    request<Box>(`/me/box`),
+
   getBoxes: async (): Promise<Box[]> => {
     const data = await request<{ boxes: Box[] }>("/internal/boxes");
     return data.boxes;

@@ -14,7 +14,7 @@ export default function DashboardPage() {
     api
       .getBox("me")
       .then(setBox)
-      .catch((e) => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           <div className="col-span-2">
             <dt className="text-muted-foreground">Telegram Users</dt>
             <dd className="mt-0.5 font-medium">
-              {box.telegram_users.join(", ")}
+              {box.telegram_user_ids.join(", ")}
             </dd>
           </div>
         </dl>
