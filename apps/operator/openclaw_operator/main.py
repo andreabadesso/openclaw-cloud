@@ -24,6 +24,7 @@ from .jobs.suspend import handle_suspend
 from .jobs.update import handle_update
 from .jobs.update_connections import handle_update_connections
 from .k8s import init_k8s
+from .metrics import metrics_loop
 
 logging.basicConfig(
     level=logging.INFO,
@@ -211,16 +212,19 @@ async def health(request: Request) -> JSONResponse:
 
 @asynccontextmanager
 async def lifespan(app: Starlette):
-    # Start the job loop as a background task
+    # Start the job loop and metrics collector as background tasks
     init_k8s()
-    task = asyncio.create_task(job_loop())
+    job_task = asyncio.create_task(job_loop())
+    metrics_task = asyncio.create_task(metrics_loop(get_session_factory()))
     yield
     _shutdown_event.set()
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    job_task.cancel()
+    metrics_task.cancel()
+    for t in (job_task, metrics_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 app = Starlette(

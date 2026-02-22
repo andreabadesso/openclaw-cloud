@@ -119,3 +119,29 @@ class ConnectLinkRequest(BaseModel):
 
 class ConnectLinkResponse(BaseModel):
     url: str
+
+
+class TokenUsageSummary(BaseModel):
+    tokens_used: int
+    tokens_limit: int
+    period_start: datetime | None = None
+    period_end: datetime | None = None
+
+
+class BrowserSessionsSummary(BaseModel):
+    session_count: int
+    total_duration_ms: int
+
+
+class PodMetricsPoint(BaseModel):
+    cpu_millicores: int
+    memory_bytes: int
+    ts: datetime
+
+
+class AnalyticsResponse(BaseModel):
+    token_usage: TokenUsageSummary
+    browser_sessions: BrowserSessionsSummary
+    pod_metrics_latest: PodMetricsPoint | None = None
+    pod_metrics_series: list[PodMetricsPoint]
+    tier: str
