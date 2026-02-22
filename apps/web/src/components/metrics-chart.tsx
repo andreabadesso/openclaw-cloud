@@ -32,7 +32,7 @@ export function MetricsChart({
   }
 
   const values = data.map((d) => d.value);
-  const ceil = maxValue ?? Math.max(...values) * 1.1 || 1;
+  const ceil = maxValue ?? (Math.max(...values) * 1.1 || 1);
 
   const points = data.map((d, i) => {
     const x = PAD.left + (i / Math.max(data.length - 1, 1)) * plotW;
