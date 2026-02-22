@@ -122,6 +122,7 @@ def create_config_secret(
         "OPENCLAW_MODEL": model,
         "OPENCLAW_THINKING": thinking,
         "NODE_OPTIONS": "--max-old-space-size=896",
+        "OPENCLAW_BROWSER_PROXY_URL": settings.browser_proxy_url,
     }
     if system_prompt:
         data["OPENCLAW_SYSTEM_PROMPT"] = system_prompt
@@ -216,7 +217,21 @@ def create_network_policy(customer_id: str) -> None:
                         ],
                         ports=[V1NetworkPolicyPort(port=8080)],
                     ),
-                    # Rule 3: Allow egress to API service in platform namespace
+                    # Rule 3: Allow egress to browser-proxy in platform namespace
+                    V1NetworkPolicyEgressRule(
+                        to=[
+                            V1NetworkPolicyPeer(
+                                namespace_selector=V1LabelSelector(
+                                    match_labels={"kubernetes.io/metadata.name": "platform"},
+                                ),
+                                pod_selector=V1LabelSelector(
+                                    match_labels={"app": "browser-proxy"},
+                                ),
+                            ),
+                        ],
+                        ports=[V1NetworkPolicyPort(port=9223)],
+                    ),
+                    # Rule 4: Allow egress to API service in platform namespace
                     V1NetworkPolicyEgressRule(
                         to=[
                             V1NetworkPolicyPeer(

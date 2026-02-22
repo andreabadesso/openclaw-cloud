@@ -18,6 +18,12 @@ services:
       dockerfile: apps/operator/Dockerfile
     image: ghcr.io/andreabadesso/openclaw-cloud/operator:latest
 
+  browser-proxy:
+    build:
+      context: apps/browser-proxy
+      dockerfile: Dockerfile
+    image: ghcr.io/andreabadesso/openclaw-cloud/browser-proxy:latest
+
   web:
     build:
       context: apps/web

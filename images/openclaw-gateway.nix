@@ -179,6 +179,15 @@ Available providers: github, google, slack, linear, notion, jira
 EOAGENTS
     fi
 
+    # Browser proxy config — embed proxy token as Basic auth in the URL
+    BROWSER_PROXY_RAW="''${OPENCLAW_BROWSER_PROXY_URL:-}"
+    if [ -n "$BROWSER_PROXY_RAW" ] && [ -n "$API_KEY" ]; then
+      # Insert token as username: http://TOKEN@host:port
+      BROWSER_PROXY_URL=$(printf '%s' "$BROWSER_PROXY_RAW" | sed "s|://|://$API_KEY@|")
+    else
+      BROWSER_PROXY_URL="$BROWSER_PROXY_RAW"
+    fi
+
     # Build openclaw config JSON using jq (avoids heredoc quoting issues)
     CONFIG=$(jq -n \
       --arg provider "$PROVIDER" \
@@ -189,6 +198,7 @@ EOAGENTS
       --arg workspace "$WORKSPACE_DIR" \
       --arg api_key "$API_KEY" \
       --arg base_url "$BASE_URL" \
+      --arg browser_proxy "$BROWSER_PROXY_URL" \
       --argjson allow_from "$ALLOW_JSON" \
       '{
         commands: { native: "auto", nativeSkills: "auto", restart: true },
@@ -208,6 +218,15 @@ EOAGENTS
           telegram: { tokenFile: $token_file, allowFrom: $allow_from }
         }
       }
+      | if $browser_proxy != "" then
+          .browser = {
+            enabled: true,
+            defaultProfile: "cloud",
+            profiles: {
+              cloud: { cdpUrl: $browser_proxy, color: "#00AA00" }
+            }
+          }
+        else . end
       | if $base_url != "" then
           .models = {
             mode: "merge",
