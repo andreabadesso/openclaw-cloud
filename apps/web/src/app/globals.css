@@ -196,3 +196,42 @@
 .btn-cta:hover::before {
   transform: translateX(100%);
 }
+
+/* ── Dashboard layout: hide global header ── */
+body:has(.dashboard-layout) header.fixed {
+  display: none;
+}
+
+/* ── Sidebar nav items ── */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.15s ease;
+  border-left: 2px solid transparent;
+}
+.nav-item:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.04);
+}
+.nav-item.active {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  border-left-color: #10b981;
+}
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}

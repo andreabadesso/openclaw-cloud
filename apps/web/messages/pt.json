@@ -3,7 +3,8 @@
     "pricing": "Precos",
     "dashboard": "Painel",
     "connections": "Conexoes",
-    "getStarted": "Comecar"
+    "getStarted": "Comecar",
+    "login": "Entrar"
   },
   "hero": {
     "title": "Agentes de IA especializados.",
@@ -65,5 +66,88 @@
     "title": "Pronto para comecar?",
     "subtitle": "Configure seu agente de IA especializado em menos de um minuto.",
     "button": "Comecar Agora"
+  },
+  "auth": {
+    "loginTitle": "Bem-vindo de volta",
+    "loginSubtitle": "Entre para gerenciar seu agente de IA",
+    "continueWithGoogle": "Continuar com Google",
+    "continueWithGitHub": "Continuar com GitHub",
+    "processing": "Entrando..."
+  },
+  "setup": {
+    "continue": "Continuar",
+    "back": "Voltar",
+    "welcome": {
+      "title": "Configure seu agente de IA",
+      "subtitle": "Comece em 3 passos simples",
+      "cta": "Vamos La"
+    },
+    "niche": {
+      "title": "Escolha seu nicho",
+      "subtitle": "Selecione a especializacao do seu agente",
+      "general": "Geral",
+      "pharmacy": "Farmacia",
+      "legal": "Juridico",
+      "realestate": "Imobiliario",
+      "accounting": "Contabilidade",
+      "comingSoon": "Em breve"
+    },
+    "telegram": {
+      "title": "Conecte o Telegram",
+      "subtitle": "Configure seu bot e vincule sua conta",
+      "botTokenLabel": "Token do Bot",
+      "botTokenPlaceholder": "Cole o token do bot do @BotFather",
+      "botStep1": "1. Abra o Telegram e procure @BotFather",
+      "botStep2": "2. Envie /newbot e siga as instrucoes",
+      "botStep3": "3. Copie o token que receber",
+      "userIdLabel": "Seu ID do Telegram",
+      "userIdPlaceholder": "Seu ID numerico do Telegram",
+      "userIdHint": "Envie /start para @userinfobot para obter seu ID"
+    },
+    "tier": {
+      "title": "Escolha seu plano",
+      "subtitle": "Selecione o plano ideal para voce",
+      "selected": "Selecionado",
+      "starter": { "name": "Starter" },
+      "pro": { "name": "Pro" },
+      "team": { "name": "Team" }
+    },
+    "review": {
+      "title": "Revisar e Criar",
+      "subtitle": "Tudo certo? Vamos criar seu agente.",
+      "nicheLabel": "Nicho",
+      "telegramLabel": "Telegram",
+      "telegramConfigured": "Token do bot e ID configurados",
+      "tierLabel": "Plano",
+      "change": "Alterar",
+      "submit": "Criar Meu Agente",
+      "creating": "Criando seu agente..."
+    }
+  },
+  "dashboard": {
+    "nav": {
+      "overview": "Visao Geral",
+      "connections": "Conexoes",
+      "analytics": "Analiticos",
+      "settings": "Configuracoes"
+    },
+    "overview": {
+      "title": "Visao Geral",
+      "agentStatus": "Status do Agente",
+      "tokenUsage": "Uso de Tokens",
+      "browserSessions": "Sessoes do Navegador",
+      "configuration": "Configuracao",
+      "upSince": "Ativo desde"
+    },
+    "settings": {
+      "title": "Configuracoes",
+      "model": "Modelo",
+      "thinkingLevel": "Nivel de Raciocinio",
+      "language": "Idioma",
+      "telegramUsers": "Usuarios Telegram",
+      "tier": "Plano Atual",
+      "save": "Salvar Alteracoes",
+      "saving": "Salvando..."
+    }
   }
 }

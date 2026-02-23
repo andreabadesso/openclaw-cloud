@@ -3,6 +3,24 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 
+class SetupRequest(BaseModel):
+    telegram_bot_token: str
+    telegram_user_id: int
+    tier: str = Field(pattern=r"^(starter|pro|team)$")
+    niche: str | None = None
+    model: str = "kimi-coding/k2p5"
+    thinking_level: str = "medium"
+    language: str = "en"
+
+
+class MeResponse(BaseModel):
+    id: str
+    email: str
+    name: str | None = None
+    avatar_url: str | None = None
+    has_box: bool
+
+
 class BoxResponse(BaseModel):
     id: str
     status: str

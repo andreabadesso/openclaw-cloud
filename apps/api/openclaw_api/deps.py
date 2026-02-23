@@ -1,7 +1,8 @@
 from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,12 +32,23 @@ async def close_redis() -> None:
 
 
 async def get_current_customer_id(
+    request: Request,
     x_customer_id: str | None = Header(None),
 ) -> str:
-    """Placeholder auth dependency. Will be replaced with JWT validation tomorrow."""
-    if not x_customer_id:
-        raise HTTPException(status_code=401, detail="Missing X-Customer-Id header")
-    return x_customer_id
+    """Extract customer_id from JWT Bearer token, with debug fallback to X-Customer-Id header."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.removeprefix("Bearer ")
+        try:
+            payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+            return payload["sub"]
+        except (JWTError, KeyError):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if settings.debug and x_customer_id:
+        return x_customer_id
+
+    raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
 
 async def get_active_box_or_none(customer_id: str, db: AsyncSession):

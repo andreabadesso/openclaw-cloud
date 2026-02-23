@@ -3,6 +3,7 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { Header } from "@/components/header";
+import { AuthProvider } from "@/lib/auth";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -26,8 +27,10 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <Header />
-      <main>{children}</main>
+      <AuthProvider>
+        <Header />
+        <main>{children}</main>
+      </AuthProvider>
     </NextIntlClientProvider>
   );
 }

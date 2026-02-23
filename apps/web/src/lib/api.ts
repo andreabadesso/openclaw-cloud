@@ -1,20 +1,40 @@
+import type { User } from "./auth";
+
 const API_URL = "/api";
 
-// TODO: Replace with real JWT auth
-const DEV_CUSTOMER_ID = "640a8328-dda2-4a48-a057-edfd93931667";
+const TOKEN_KEY = "openclaw_token";
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
 
 async function request<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
-      "Content-Type": "application/json",
-      "X-Customer-Id": DEV_CUSTOMER_ID,
+      ...headers,
       ...options?.headers,
     },
     ...options,
   });
+
+  if (res.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.reload();
+    throw new Error("Unauthorized");
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -86,7 +106,22 @@ export interface AnalyticsData {
   tier: string;
 }
 
+export interface UpdateBoxRequest {
+  model?: string;
+  thinking_level?: string;
+  language?: string;
+  telegram_user_ids?: number[];
+}
+
 export const api = {
+  getMe: (): Promise<User> => request<User>("/auth/me"),
+
+  setup: (data: Record<string, unknown>) =>
+    request("/me/setup", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   getBox: (id: string): Promise<Box> =>
     request<Box>(`/me/box`),
 
@@ -133,4 +168,10 @@ export const api = {
 
   getAnalytics: (hours = 24) =>
     request<AnalyticsData>(`/me/analytics?hours=${hours}`),
+
+  updateBox: (data: UpdateBoxRequest) =>
+    request<Box>("/me/box/update", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
