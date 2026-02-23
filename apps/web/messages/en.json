@@ -3,7 +3,8 @@
     "pricing": "Pricing",
     "dashboard": "Dashboard",
     "connections": "Connections",
-    "getStarted": "Get Started"
+    "getStarted": "Get Started",
+    "login": "Login"
   },
   "hero": {
     "title": "Specialized AI agents.",
@@ -65,5 +66,88 @@
     "title": "Ready to get started?",
     "subtitle": "Set up your specialized AI agent in under a minute.",
     "button": "Get Started"
+  },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Sign in to manage your AI agent",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithGitHub": "Continue with GitHub",
+    "processing": "Signing you in..."
+  },
+  "setup": {
+    "continue": "Continue",
+    "back": "Back",
+    "welcome": {
+      "title": "Set up your AI agent",
+      "subtitle": "Get started in 3 simple steps",
+      "cta": "Let's Go"
+    },
+    "niche": {
+      "title": "Choose your niche",
+      "subtitle": "Select the specialization for your agent",
+      "general": "General",
+      "pharmacy": "Pharmacy",
+      "legal": "Legal",
+      "realestate": "Real Estate",
+      "accounting": "Accounting",
+      "comingSoon": "Coming soon"
+    },
+    "telegram": {
+      "title": "Connect Telegram",
+      "subtitle": "Set up your bot and link your account",
+      "botTokenLabel": "Bot Token",
+      "botTokenPlaceholder": "Paste your bot token from @BotFather",
+      "botStep1": "1. Open Telegram and search for @BotFather",
+      "botStep2": "2. Send /newbot and follow the instructions",
+      "botStep3": "3. Copy the token you receive",
+      "userIdLabel": "Your Telegram User ID",
+      "userIdPlaceholder": "Your numeric Telegram user ID",
+      "userIdHint": "Send /start to @userinfobot to get your ID"
+    },
+    "tier": {
+      "title": "Choose your plan",
+      "subtitle": "Select the plan that fits your needs",
+      "selected": "Selected",
+      "starter": { "name": "Starter" },
+      "pro": { "name": "Pro" },
+      "team": { "name": "Team" }
+    },
+    "review": {
+      "title": "Review & Create",
+      "subtitle": "Everything looks good? Let's create your agent.",
+      "nicheLabel": "Niche",
+      "telegramLabel": "Telegram",
+      "telegramConfigured": "Bot token & user ID configured",
+      "tierLabel": "Plan",
+      "change": "Change",
+      "submit": "Create My Agent",
+      "creating": "Creating your agent..."
+    }
+  },
+  "dashboard": {
+    "nav": {
+      "overview": "Overview",
+      "connections": "Connections",
+      "analytics": "Analytics",
+      "settings": "Settings"
+    },
+    "overview": {
+      "title": "Overview",
+      "agentStatus": "Agent Status",
+      "tokenUsage": "Token Usage",
+      "browserSessions": "Browser Sessions",
+      "configuration": "Configuration",
+      "upSince": "Up since"
+    },
+    "settings": {
+      "title": "Settings",
+      "model": "Model",
+      "thinkingLevel": "Thinking Level",
+      "language": "Language",
+      "telegramUsers": "Telegram Users",
+      "tier": "Current Tier",
+      "save": "Save Changes",
+      "saving": "Saving..."
+    }
   }
 }

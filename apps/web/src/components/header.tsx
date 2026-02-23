@@ -2,12 +2,14 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useAuth } from "@/lib/auth";
 
 export function Header() {
   const t = useTranslations("header");
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
 
   const otherLocale = locale === "pt" ? "en" : "pt";
 
@@ -28,38 +30,75 @@ export function Header() {
         </Link>
 
         <nav className="flex items-center gap-1">
-          <Link
-            href="/#pricing"
-            className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
-          >
-            {t("pricing")}
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
-          >
-            {t("dashboard")}
-          </Link>
-          <Link
-            href="/dashboard/connections"
-            className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
-          >
-            {t("connections")}
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
+              >
+                {t("dashboard")}
+              </Link>
 
-          <button
-            onClick={handleLocaleSwitch}
-            className="ml-2 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium tracking-wider text-white/40 transition-all hover:border-white/[0.15] hover:text-white/70"
-          >
-            {otherLocale.toUpperCase()}
-          </button>
+              <button
+                onClick={handleLocaleSwitch}
+                className="ml-2 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium tracking-wider text-white/40 transition-all hover:border-white/[0.15] hover:text-white/70"
+              >
+                {otherLocale.toUpperCase()}
+              </button>
 
-          <Link
-            href="/onboarding"
-            className="btn-cta ml-2 inline-flex items-center rounded-lg bg-emerald-500 px-4 py-1.5 text-[13px] font-medium text-black transition-all hover:bg-emerald-400"
-          >
-            {t("getStarted")}
-          </Link>
+              {/* Avatar */}
+              <div className="ml-2 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.06]">
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[12px] font-medium text-white/60">
+                    {(user?.name ?? user?.email ?? "?").charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <Link
+                href="/dashboard"
+                className="btn-cta ml-2 inline-flex items-center rounded-lg bg-emerald-500 px-4 py-1.5 text-[13px] font-medium text-black transition-all hover:bg-emerald-400"
+              >
+                {t("dashboard")}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/#pricing"
+                className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
+              >
+                {t("pricing")}
+              </Link>
+
+              <button
+                onClick={handleLocaleSwitch}
+                className="ml-2 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium tracking-wider text-white/40 transition-all hover:border-white/[0.15] hover:text-white/70"
+              >
+                {otherLocale.toUpperCase()}
+              </button>
+
+              <Link
+                href="/login"
+                className="ml-2 rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
+              >
+                {t("login")}
+              </Link>
+
+              <Link
+                href="/login"
+                className="btn-cta ml-2 inline-flex items-center rounded-lg bg-emerald-500 px-4 py-1.5 text-[13px] font-medium text-black transition-all hover:bg-emerald-400"
+              >
+                {t("getStarted")}
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>

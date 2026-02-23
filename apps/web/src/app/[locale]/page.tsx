@@ -1,6 +1,10 @@
+"use client";
+
 import { useTranslations } from "next-intl";
 import { NicheCard } from "@/components/niche-card";
 import { PricingCard } from "@/components/pricing-card";
+import { useAuth } from "@/lib/auth";
+import { Link } from "@/i18n/navigation";
 
 const NICHES = [
   { slug: "pharmacy", icon: "💊", available: true },
@@ -17,6 +21,10 @@ const TIERS = [
 
 export default function HomePage() {
   const t = useTranslations();
+  const { isAuthenticated } = useAuth();
+
+  const ctaHref = isAuthenticated ? "/dashboard" : "/login";
+  const ctaText = isAuthenticated ? t("header.dashboard") : t("hero.cta");
 
   return (
     <>
@@ -47,11 +55,11 @@ export default function HomePage() {
 
         {/* CTA */}
         <div className="animate-fade-up delay-300 relative z-10 mt-10 flex items-center gap-4">
-          <a
-            href="/onboarding"
+          <Link
+            href={ctaHref}
             className="btn-cta inline-flex items-center rounded-xl bg-emerald-500 px-7 py-3 text-[14px] font-semibold text-black transition-all hover:bg-emerald-400 hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.4)]"
           >
-            {t("hero.cta")}
+            {ctaText}
             <svg
               className="ml-2 h-4 w-4"
               fill="none"
@@ -65,7 +73,7 @@ export default function HomePage() {
                 d="M13 7l5 5m0 0l-5 5m5-5H6"
               />
             </svg>
-          </a>
+          </Link>
         </div>
 
         {/* Bottom fade */}
@@ -194,11 +202,11 @@ export default function HomePage() {
           <p className="mt-4 text-[15px] text-white/40">
             {t("cta.subtitle")}
           </p>
-          <a
-            href="/onboarding"
+          <Link
+            href={ctaHref}
             className="btn-cta mt-10 inline-flex items-center rounded-xl bg-emerald-500 px-8 py-3.5 text-[14px] font-semibold text-black transition-all hover:bg-emerald-400 hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.4)]"
           >
-            {t("cta.button")}
+            {isAuthenticated ? t("header.dashboard") : t("cta.button")}
             <svg
               className="ml-2 h-4 w-4"
               fill="none"
@@ -212,7 +220,7 @@ export default function HomePage() {
                 d="M13 7l5 5m0 0l-5 5m5-5H6"
               />
             </svg>
-          </a>
+          </Link>
         </div>
       </section>
 
