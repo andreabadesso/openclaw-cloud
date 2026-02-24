@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
+ARG VITE_NANGO_URL
 RUN npm run build
 
 FROM nginx:alpine

@@ -123,3 +123,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            ${{ matrix.service == 'web' && format('VITE_NANGO_URL={0}', secrets.VITE_NANGO_URL) || '' }}
