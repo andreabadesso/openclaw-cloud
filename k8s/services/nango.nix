@@ -22,7 +22,7 @@ in {
                 { name = "NANGO_SERVER_URL";    valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_server_url"; }; }
                 { name = "NANGO_DB_HOST";       value = "postgres.platform.svc.cluster.local"; }
                 { name = "NANGO_DB_PORT";       value = "5432"; }
-                { name = "NANGO_REDIS_URL";     value = "redis://redis.platform.svc.cluster.local:6379/1"; }
+                { name = "NANGO_REDIS_URL";     valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_redis_url"; }; }
                 { name = "FLAG_AUTH_ENABLED";   value = "false"; }
               ];
               ports = [{ containerPort = 8080; protocol = "TCP"; }];
