@@ -16,6 +16,7 @@ in {
               inherit image;
               env = [
                 { name = "NEXT_PUBLIC_NANGO_URL"; value = "https://nango.openclaw.trustbit.co.in"; }
+                { name = "NEXT_PUBLIC_DEV_MODE";  value = "true"; }
                 { name = "PORT";                value = "3000"; }
                 { name = "API_URL";             value = "http://api.platform.svc.cluster.local:8000"; }
               ];
