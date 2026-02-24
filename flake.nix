@@ -77,7 +77,13 @@
         age
         jq
         yq-go
-        (python312.withPackages (ps: with ps; [ httpx rich typer ]))
+        (python312.withPackages (ps: with ps; [
+          httpx rich typer
+          # API deps
+          fastapi uvicorn sqlalchemy asyncpg redis pydantic pydantic-settings python-jose stripe
+          # API test deps
+          pytest pytest-asyncio aiosqlite greenlet
+        ]))
       ];
       shellHook = ''
         echo "openclaw-cloud dev shell"

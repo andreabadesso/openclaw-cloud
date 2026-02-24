@@ -1,34 +1,72 @@
-from unittest.mock import MagicMock, patch
-
 import pytest
+from unittest.mock import MagicMock
+
 from fastapi import HTTPException
 
 from openclaw_api.deps import get_current_customer_id
 
 
-def _mock_request(auth_header: str | None = None) -> MagicMock:
-    request = MagicMock()
-    request.headers.get.return_value = auth_header
-    return request
+def _make_request(auth_header=None):
+    """Create a mock Request with the given Authorization header."""
+    req = MagicMock()
+    headers = {}
+    if auth_header is not None:
+        headers["Authorization"] = auth_header
+    req.headers = headers
+    return req
 
 
 @pytest.mark.anyio
-async def test_get_current_customer_id_valid():
-    with patch("openclaw_api.deps.settings") as mock_settings:
-        mock_settings.debug = True
-        result = await get_current_customer_id(request=_mock_request(), x_customer_id="cust-123")
-    assert result == "cust-123"
+async def test_get_current_customer_id_via_header():
+    """In debug mode with X-Customer-Id header, returns the header value."""
+    from openclaw_api.config import settings
+    original_debug = settings.debug
+    settings.debug = True
+    try:
+        result = await get_current_customer_id(
+            request=_make_request(),
+            x_customer_id="cust-123",
+        )
+        assert result == "cust-123"
+    finally:
+        settings.debug = original_debug
 
 
 @pytest.mark.anyio
 async def test_get_current_customer_id_missing():
-    with pytest.raises(HTTPException) as exc_info:
-        await get_current_customer_id(request=_mock_request(), x_customer_id=None)
-    assert exc_info.value.status_code == 401
+    """Without auth and without debug header, returns 401."""
+    from openclaw_api.config import settings
+    original_debug = settings.debug
+    original_dev = settings.dev_mode
+    settings.debug = False
+    settings.dev_mode = False
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_customer_id(
+                request=_make_request(),
+                x_customer_id=None,
+            )
+        assert exc_info.value.status_code == 401
+    finally:
+        settings.debug = original_debug
+        settings.dev_mode = original_dev
 
 
 @pytest.mark.anyio
 async def test_get_current_customer_id_empty():
-    with pytest.raises(HTTPException) as exc_info:
-        await get_current_customer_id(request=_mock_request(), x_customer_id="")
-    assert exc_info.value.status_code == 401
+    """Empty X-Customer-Id with no auth and debug off returns 401."""
+    from openclaw_api.config import settings
+    original_debug = settings.debug
+    original_dev = settings.dev_mode
+    settings.debug = False
+    settings.dev_mode = False
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_customer_id(
+                request=_make_request(),
+                x_customer_id="",
+            )
+        assert exc_info.value.status_code == 401
+    finally:
+        settings.debug = original_debug
+        settings.dev_mode = original_dev

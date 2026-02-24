@@ -3,19 +3,20 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from tests.conftest import TEST_BOX_ID, TEST_CUSTOMER_ID, mock_redis
+from tests.conftest import TEST_BOX_ID, TEST_BUNDLE_ID, TEST_CUSTOMER_ID, mock_redis
 
 
 # --- Provision ---
 
 
 @pytest.mark.anyio
-async def test_provision_creates_customer_and_box(client, db):
+async def test_provision_creates_customer_and_box(client, db, seed_bundle):
     resp = await client.post("/internal/provision", json={
         "telegram_bot_token": "tok_123",
         "telegram_user_id": 99999,
         "tier": "starter",
         "customer_email": "new@example.com",
+        "bundle_id": TEST_BUNDLE_ID,
     })
     assert resp.status_code == 200
     data = resp.json()
@@ -26,25 +27,42 @@ async def test_provision_creates_customer_and_box(client, db):
 
 
 @pytest.mark.anyio
-async def test_provision_duplicate_box(client, seed_box):
+async def test_provision_multiple_boxes_allowed(client, seed_box, seed_bundle):
+    """Multi-agent: provisioning a second box for existing customer should succeed."""
     resp = await client.post("/internal/provision", json={
         "telegram_bot_token": "tok_123",
         "telegram_user_id": 99999,
         "tier": "starter",
         "customer_email": "test@example.com",
+        "bundle_id": TEST_BUNDLE_ID,
     })
-    assert resp.status_code == 409
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["customer_id"] == TEST_CUSTOMER_ID
 
 
 @pytest.mark.anyio
-async def test_provision_invalid_tier(client):
+async def test_provision_invalid_tier(client, seed_bundle):
     resp = await client.post("/internal/provision", json={
         "telegram_bot_token": "tok_123",
         "telegram_user_id": 99999,
         "tier": "invalid",
         "customer_email": "new@example.com",
+        "bundle_id": TEST_BUNDLE_ID,
     })
     assert resp.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_provision_invalid_bundle(client):
+    resp = await client.post("/internal/provision", json={
+        "telegram_bot_token": "tok_123",
+        "telegram_user_id": 99999,
+        "tier": "starter",
+        "customer_email": "new@example.com",
+        "bundle_id": "00000000-0000-0000-0000-nonexistent00",
+    })
+    assert resp.status_code == 400
 
 
 # --- Destroy ---

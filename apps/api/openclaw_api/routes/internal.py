@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openclaw_api.deps import get_db, get_redis
@@ -10,6 +10,7 @@ from openclaw_api.jobs import enqueue_job
 from openclaw_api.models import (
     Box,
     BoxStatus,
+    Bundle,
     Customer,
     JobStatus,
     JobType,
@@ -19,7 +20,6 @@ from openclaw_api.models import (
     Tier,
     UsageMonthly,
 )
-from openclaw_api.niches import NICHES
 from openclaw_api.schemas import (
     BoxListItem,
     BoxListResponse,
@@ -56,18 +56,25 @@ async def provision_box(
         db.add(customer)
         await db.flush()
 
-    # Validate niche if provided
-    if body.niche and body.niche not in NICHES:
-        raise HTTPException(status_code=400, detail=f"Unknown niche: {body.niche}")
-
-    # Check for existing active box
-    existing = await db.execute(
-        select(Box)
-        .where(Box.customer_id == customer.id)
-        .where(Box.status.notin_([BoxStatus.destroyed, BoxStatus.destroying]))
+    # Validate bundle
+    bundle_result = await db.execute(
+        select(Bundle).where(Bundle.id == body.bundle_id)
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Customer already has an active box")
+    bundle = bundle_result.scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(status_code=400, detail="Invalid bundle")
+
+    # Apply bundle defaults for optional fields
+    model = body.model or bundle.default_model
+    thinking_level = body.thinking_level or bundle.default_thinking_level
+    language = body.language or bundle.default_language
+
+    # Count existing boxes for unique namespace suffix
+    count_result = await db.execute(
+        select(func.count()).select_from(Box).where(Box.customer_id == customer.id)
+    )
+    box_count = count_result.scalar() or 0
+    namespace_suffix = f"-{box_count + 1}" if box_count > 0 else ""
 
     # Create subscription
     now = datetime.now(timezone.utc)
@@ -87,12 +94,13 @@ async def provision_box(
     box = Box(
         customer_id=customer.id,
         subscription_id=subscription.id,
-        k8s_namespace=f"customer-{customer.id}",
+        k8s_namespace=f"customer-{customer.id}{namespace_suffix}",
         telegram_user_ids=[body.telegram_user_id],
-        language=body.language,
-        model=body.model,
-        thinking_level=body.thinking_level,
-        niche=body.niche,
+        language=language,
+        model=model,
+        thinking_level=thinking_level,
+        bundle_id=bundle.id,
+        niche=bundle.slug,
         status=BoxStatus.pending,
     )
     db.add(box)
@@ -117,10 +125,12 @@ async def provision_box(
             "telegram_bot_token": body.telegram_bot_token,
             "telegram_user_id": body.telegram_user_id,
             "tier": body.tier,
-            "model": body.model,
-            "thinking_level": body.thinking_level,
-            "language": body.language,
-            "niche": body.niche,
+            "model": model,
+            "thinking_level": thinking_level,
+            "language": language,
+            "bundle_prompts": bundle.prompts,
+            "bundle_mcp_servers": bundle.mcp_servers,
+            "bundle_skills": bundle.skills,
         },
     )
     db.add(job)

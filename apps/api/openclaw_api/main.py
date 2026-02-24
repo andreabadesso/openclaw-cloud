@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from openclaw_api.config import settings
 from openclaw_api.database import engine
 from openclaw_api.deps import close_redis
-from openclaw_api.routes import analytics, auth, billing, boxes, connections, health, internal, usage
+from openclaw_api.routes import analytics, auth, billing, boxes, bundles, connections, health, internal, usage
 
 
 @asynccontextmanager
@@ -20,7 +20,7 @@ app = FastAPI(title="OpenClaw Cloud API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins.split(","),
+    allow_origins=["*"] if settings.dev_mode else settings.cors_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,6 +28,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(bundles.router)
 app.include_router(boxes.router)
 app.include_router(usage.router)
 app.include_router(analytics.router)

@@ -1,16 +1,16 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class SetupRequest(BaseModel):
     telegram_bot_token: str
     telegram_user_id: int
     tier: str = Field(pattern=r"^(starter|pro|team)$")
-    niche: str | None = None
-    model: str = "kimi-coding/k2p5"
-    thinking_level: str = "medium"
-    language: str = "en"
+    bundle_id: str
+    model: str | None = None
+    thinking_level: str | None = None
+    language: str | None = None
 
 
 class MeResponse(BaseModel):
@@ -29,6 +29,7 @@ class BoxResponse(BaseModel):
     thinking_level: str
     language: str
     niche: str | None = None
+    bundle_id: str | None = None
     telegram_user_ids: list[int]
     created_at: datetime
     activated_at: datetime | None = None
@@ -48,11 +49,11 @@ class ProvisionRequest(BaseModel):
     telegram_bot_token: str
     telegram_user_id: int
     tier: str = Field(pattern=r"^(starter|pro|team)$")
-    model: str = "kimi-coding/k2p5"
-    thinking_level: str = "medium"
-    language: str = "en"
     customer_email: str
-    niche: str | None = None
+    bundle_id: str
+    model: str | None = None
+    thinking_level: str | None = None
+    language: str | None = None
 
 
 class UpdateBoxRequest(BaseModel):
@@ -71,6 +72,7 @@ class BoxListItem(BaseModel):
     thinking_level: str
     language: str
     niche: str | None = None
+    bundle_id: str | None = None
     telegram_user_ids: list[int]
     created_at: datetime
     activated_at: datetime | None = None
@@ -163,3 +165,84 @@ class AnalyticsResponse(BaseModel):
     pod_metrics_latest: PodMetricsPoint | None = None
     pod_metrics_series: list[PodMetricsPoint]
     tier: str
+
+
+# --- Bundle schemas ---
+
+
+class BundleProvider(BaseModel):
+    provider: str
+    required: bool = False
+
+
+class BundleResponse(BaseModel):
+    id: str
+    slug: str
+    name: str
+    description: str
+    icon: str
+    color: str
+    status: str
+    prompts: dict
+    default_model: str
+    default_thinking_level: str
+    default_language: str
+    providers: list[BundleProvider]
+    mcp_servers: dict
+    skills: list[str]
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class BundleListItem(BaseModel):
+    id: str
+    slug: str
+    name: str
+    description: str
+    icon: str
+    color: str
+    providers: list[BundleProvider]
+    skills: list[str]
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class BundleListResponse(BaseModel):
+    bundles: list[BundleListItem]
+
+
+class CreateBundleRequest(BaseModel):
+    slug: str
+    name: str
+    description: str = ""
+    icon: str = "🤖"
+    color: str = "#10B981"
+    status: str = "draft"
+    prompts: dict = {}
+    default_model: str = "claude-sonnet-4-20250514"
+    default_thinking_level: str = "medium"
+    default_language: str = "en"
+    providers: list[BundleProvider] = []
+    mcp_servers: dict = {}
+    skills: list[str] = []
+    sort_order: int = 0
+
+
+class UpdateBundleRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    status: str | None = None
+    prompts: dict | None = None
+    default_model: str | None = None
+    default_thinking_level: str | None = None
+    default_language: str | None = None
+    providers: list[BundleProvider] | None = None
+    mcp_servers: dict | None = None
+    skills: list[str] | None = None
+    sort_order: int | None = None

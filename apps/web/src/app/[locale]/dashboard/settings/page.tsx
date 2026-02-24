@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { api, type Box, type UpdateBoxRequest } from "@/lib/api";
+import { api, type Box, type BundleListItem, type UpdateBoxRequest } from "@/lib/api";
 import { Link } from "@/i18n/navigation";
-import { Save, ExternalLink } from "lucide-react";
+import { Save, ExternalLink, Package } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const [box, setBox] = useState<Box | null>(null);
+  const [bundles, setBundles] = useState<BundleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,10 +22,13 @@ export default function SettingsPage() {
   const [telegramIds, setTelegramIds] = useState("");
 
   useEffect(() => {
-    api
-      .getBox("me")
-      .then((b) => {
+    Promise.all([
+      api.getBox("me"),
+      api.getBundles().catch(() => [] as BundleListItem[]),
+    ])
+      .then(([b, bndls]) => {
         setBox(b);
+        setBundles(bndls);
         setModel(b.model);
         setThinkingLevel(b.thinking_level);
         setLanguage(b.language);
@@ -147,6 +151,49 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
+
+        {/* Bundle */}
+        {(() => {
+          const bundle = bundles.find((b) => b.id === box.bundle_id);
+          if (!bundle) return null;
+          return (
+            <div className="animate-fade-up delay-150 rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 card-glow">
+              <h2 className="mb-4 text-sm font-medium text-white/50">Bundle</h2>
+              <div className="flex items-center gap-4">
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-lg text-2xl"
+                  style={{ backgroundColor: `${bundle.color}15` }}
+                >
+                  {bundle.icon}
+                </div>
+                <div>
+                  <p className="font-semibold text-white/90">{bundle.name}</p>
+                  <p className="text-sm text-white/40">{bundle.description}</p>
+                </div>
+              </div>
+              {bundle.skills.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-medium text-white/30 uppercase tracking-wider">Installed Skills</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {bundle.skills.map((slug) => (
+                      <a
+                        key={slug}
+                        href={`https://clawhub.ai/skills/${slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400/70 transition-colors hover:text-emerald-400"
+                      >
+                        <Package className="h-3 w-3" />
+                        {slug}
+                        <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Editable config */}
         <div className="animate-fade-up delay-200 rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 card-glow">
