@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -14,7 +14,9 @@ def _mock_request(auth_header: str | None = None) -> MagicMock:
 
 @pytest.mark.anyio
 async def test_get_current_customer_id_valid():
-    result = await get_current_customer_id(request=_mock_request(), x_customer_id="cust-123")
+    with patch("openclaw_api.deps.settings") as mock_settings:
+        mock_settings.debug = True
+        result = await get_current_customer_id(request=_mock_request(), x_customer_id="cust-123")
     assert result == "cust-123"
 
 
