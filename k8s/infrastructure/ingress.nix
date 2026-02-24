@@ -21,7 +21,7 @@
           http.paths = [{
             path     = "/";
             pathType = "Prefix";
-            backend.service = { name = "web";  port.number = 3000; };
+            backend.service = { name = "web";  port.number = 80; };
           }];
         }
         {
