@@ -7,40 +7,20 @@
     "login": "Entrar"
   },
   "hero": {
-    "title": "Agentes de IA especializados.",
-    "titleAccent": "Para o seu nicho.",
-    "subtitle": "Escolha um agente especializado para sua area, conecte seus apps e comece a usar via Telegram em segundos.",
+    "title": "Agentes de IA pre-configurados.",
+    "titleAccent": "Prontos para trabalhar.",
+    "subtitle": "Escolha um pacote de agente especializado, conecte seus apps e comece a usar via Telegram em segundos.",
     "cta": "Comecar Agora"
   },
-  "niches": {
-    "sectionTitle": "Escolha seu nicho",
-    "sectionSubtitle": "Agentes treinados para entender a linguagem e os processos do seu setor.",
-    "comingSoon": "Em breve",
+  "bundles": {
+    "sectionTitle": "Pacotes de Agentes",
+    "sectionSubtitle": "Pacotes de agentes de IA com prompts, integracoes e habilidades pre-configuradas.",
     "cta": "Comecar",
-    "pharmacy": {
-      "name": "Farmacia",
-      "tagline": "Assistente farmaceutico inteligente",
-      "features": ["Consulta de bulas e interacoes", "Controle de estoque e validade", "Atendimento ao cliente", "Integracao com sistemas de gestao"]
-    },
-    "legal": {
-      "name": "Juridico",
-      "tagline": "Assistente juridico para escritorios",
-      "features": ["Pesquisa de jurisprudencia", "Redacao de pecas", "Controle de prazos", "Gestao de processos"]
-    },
-    "realestate": {
-      "name": "Imobiliario",
-      "tagline": "Assistente para corretores e imobiliarias",
-      "features": ["Gestao de leads", "Descricao de imoveis", "Agendamento de visitas", "Analise de mercado"]
-    },
-    "accounting": {
-      "name": "Contabilidade",
-      "tagline": "Assistente contabil automatizado",
-      "features": ["Classificacao de lancamentos", "Conciliacao bancaria", "Obrigacoes fiscais", "Relatorios gerenciais"]
-    }
+    "empty": "Nenhum agente disponivel ainda. Volte em breve!"
   },
   "howItWorks": {
     "title": "Como Funciona",
-    "step1": { "title": "Escolha", "desc": "Selecione o agente especializado para o seu nicho. Sem formularios, sem configuracao." },
+    "step1": { "title": "Escolha", "desc": "Escolha um pacote de agente para seu caso de uso. Sem formularios, sem configuracao." },
     "step2": { "title": "Assine", "desc": "Escolha um plano e pague com Stripe. Leva 30 segundos." },
     "step3": { "title": "Use", "desc": "Seu agente de IA esta ao vivo no Telegram em segundos." }
   },
@@ -64,7 +44,7 @@
   },
   "cta": {
     "title": "Pronto para comecar?",
-    "subtitle": "Configure seu agente de IA especializado em menos de um minuto.",
+    "subtitle": "Configure seu agente de IA em menos de um minuto.",
     "button": "Comecar Agora"
   },
   "auth": {
@@ -82,15 +62,10 @@
       "subtitle": "Comece em 3 passos simples",
       "cta": "Vamos La"
     },
-    "niche": {
-      "title": "Escolha seu nicho",
-      "subtitle": "Selecione a especializacao do seu agente",
-      "general": "Geral",
-      "pharmacy": "Farmacia",
-      "legal": "Juridico",
-      "realestate": "Imobiliario",
-      "accounting": "Contabilidade",
-      "comingSoon": "Em breve"
+    "bundle": {
+      "title": "Escolha seu agente",
+      "subtitle": "Selecione o pacote de agente ideal para voce",
+      "requiredServices": "Servicos obrigatorios"
     },
     "telegram": {
       "title": "Conecte o Telegram",
@@ -115,7 +90,7 @@
     "review": {
       "title": "Revisar e Criar",
       "subtitle": "Tudo certo? Vamos criar seu agente.",
-      "nicheLabel": "Nicho",
+      "bundleLabel": "Pacote do Agente",
       "telegramLabel": "Telegram",
       "telegramConfigured": "Token do bot e ID configurados",
       "tierLabel": "Plano",

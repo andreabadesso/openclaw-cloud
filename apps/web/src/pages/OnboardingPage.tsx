@@ -1,7 +1,5 @@
-"use client";
-
-import { useRouter } from "@/i18n/navigation";
 import { useEffect } from "react";
+import { useRouter } from "@/i18n/navigation";
 
 export default function OnboardingPage() {
   const router = useRouter();

@@ -7,40 +7,20 @@
     "login": "Login"
   },
   "hero": {
-    "title": "Specialized AI agents.",
-    "titleAccent": "For your niche.",
-    "subtitle": "Choose a specialized agent for your industry, connect your apps, and start using it via Telegram in seconds.",
+    "title": "Pre-configured AI agents.",
+    "titleAccent": "Ready to work.",
+    "subtitle": "Choose a specialized agent bundle, connect your apps, and start using it via Telegram in seconds.",
     "cta": "Get Started"
   },
-  "niches": {
-    "sectionTitle": "Choose your niche",
-    "sectionSubtitle": "Agents trained to understand the language and processes of your industry.",
-    "comingSoon": "Coming soon",
+  "bundles": {
+    "sectionTitle": "Agent Bundles",
+    "sectionSubtitle": "Curated AI agent packages with pre-configured prompts, integrations, and skills.",
     "cta": "Get Started",
-    "pharmacy": {
-      "name": "Pharmacy",
-      "tagline": "Intelligent pharmacy assistant",
-      "features": ["Drug interaction & leaflet lookup", "Inventory & expiration control", "Customer service", "Management system integration"]
-    },
-    "legal": {
-      "name": "Legal",
-      "tagline": "Legal assistant for law firms",
-      "features": ["Case law research", "Legal document drafting", "Deadline management", "Case management"]
-    },
-    "realestate": {
-      "name": "Real Estate",
-      "tagline": "Assistant for realtors and agencies",
-      "features": ["Lead management", "Property descriptions", "Visit scheduling", "Market analysis"]
-    },
-    "accounting": {
-      "name": "Accounting",
-      "tagline": "Automated accounting assistant",
-      "features": ["Entry classification", "Bank reconciliation", "Tax obligations", "Management reports"]
-    }
+    "empty": "No agents available yet. Check back soon!"
   },
   "howItWorks": {
     "title": "How It Works",
-    "step1": { "title": "Choose", "desc": "Select the specialized agent for your niche. No forms, no config." },
+    "step1": { "title": "Choose", "desc": "Pick an agent bundle for your use case. No forms, no config." },
     "step2": { "title": "Subscribe", "desc": "Pick a plan and check out with Stripe. Takes 30 seconds." },
     "step3": { "title": "Use", "desc": "Your personal AI agent is live on Telegram within seconds." }
   },
@@ -64,7 +44,7 @@
   },
   "cta": {
     "title": "Ready to get started?",
-    "subtitle": "Set up your specialized AI agent in under a minute.",
+    "subtitle": "Set up your AI agent in under a minute.",
     "button": "Get Started"
   },
   "auth": {
@@ -82,15 +62,10 @@
       "subtitle": "Get started in 3 simple steps",
       "cta": "Let's Go"
     },
-    "niche": {
-      "title": "Choose your niche",
-      "subtitle": "Select the specialization for your agent",
-      "general": "General",
-      "pharmacy": "Pharmacy",
-      "legal": "Legal",
-      "realestate": "Real Estate",
-      "accounting": "Accounting",
-      "comingSoon": "Coming soon"
+    "bundle": {
+      "title": "Choose your agent",
+      "subtitle": "Select the agent bundle that fits your needs",
+      "requiredServices": "Required services"
     },
     "telegram": {
       "title": "Connect Telegram",
@@ -115,7 +90,7 @@
     "review": {
       "title": "Review & Create",
       "subtitle": "Everything looks good? Let's create your agent.",
-      "nicheLabel": "Niche",
+      "bundleLabel": "Agent Bundle",
       "telegramLabel": "Telegram",
       "telegramConfigured": "Bot token & user ID configured",
       "tierLabel": "Plan",

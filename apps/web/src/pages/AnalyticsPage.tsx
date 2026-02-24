@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { MetricsChart } from "@/components/metrics-chart";
 import { UsageGauge } from "@/components/usage-gauge";

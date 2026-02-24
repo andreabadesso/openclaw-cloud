@@ -1,14 +1,12 @@
-"use client";
-
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "react-router-dom";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 
 const TOKEN_KEY = "openclaw_token";
 
 export default function AuthCallbackPage() {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {

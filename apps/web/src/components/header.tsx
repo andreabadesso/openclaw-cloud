@@ -1,17 +1,17 @@
-"use client";
-
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslation } from "react-i18next";
+import { useParams } from "react-router-dom";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/auth";
 
 export function Header() {
-  const t = useTranslations("header");
-  const locale = useLocale();
+  const { t } = useTranslation();
+  const { locale } = useParams<{ locale: string }>();
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
 
-  const otherLocale = locale === "pt" ? "en" : "pt";
+  const currentLocale = locale ?? "pt";
+  const otherLocale = currentLocale === "pt" ? "en" : "pt";
 
   function handleLocaleSwitch() {
     router.replace(pathname, { locale: otherLocale });
@@ -36,7 +36,7 @@ export function Header() {
                 href="/dashboard"
                 className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
               >
-                {t("dashboard")}
+                {t("header.dashboard")}
               </Link>
 
               <button
@@ -65,7 +65,7 @@ export function Header() {
                 href="/dashboard"
                 className="btn-cta ml-2 inline-flex items-center rounded-lg bg-emerald-500 px-4 py-1.5 text-[13px] font-medium text-black transition-all hover:bg-emerald-400"
               >
-                {t("dashboard")}
+                {t("header.dashboard")}
               </Link>
             </>
           ) : (
@@ -74,7 +74,7 @@ export function Header() {
                 href="/#pricing"
                 className="rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
               >
-                {t("pricing")}
+                {t("header.pricing")}
               </Link>
 
               <button
@@ -88,14 +88,14 @@ export function Header() {
                 href="/login"
                 className="ml-2 rounded-lg px-3 py-1.5 text-[13px] text-white/50 transition-colors hover:text-white/80"
               >
-                {t("login")}
+                {t("header.login")}
               </Link>
 
               <Link
                 href="/login"
                 className="btn-cta ml-2 inline-flex items-center rounded-lg bg-emerald-500 px-4 py-1.5 text-[13px] font-medium text-black transition-all hover:bg-emerald-400"
               >
-                {t("getStarted")}
+                {t("header.getStarted")}
               </Link>
             </>
           )}
