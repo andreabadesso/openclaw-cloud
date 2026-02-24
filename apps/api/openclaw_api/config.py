@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     web_url: str = "http://localhost:3000"
     debug: bool = False
+    dev_mode: bool = False
     nango_server_url: str = "http://nango-server:8080"
     nango_public_url: str = "http://localhost:3003"
     nango_secret_key: str = ""
