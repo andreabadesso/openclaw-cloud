@@ -125,8 +125,8 @@ class TestNetworkPolicyHelpers:
         body = call_kwargs["body"]
         assert body.metadata.name == "customer-isolation"
         assert body.spec.policy_types == ["Ingress", "Egress"]
-        # 5 egress rules: token-proxy, nango, api, public 443, dns
-        assert len(body.spec.egress) == 5
+        # 6 egress rules: token-proxy, nango, browser-proxy, api, public 443, dns
+        assert len(body.spec.egress) == 6
 
 
 class TestDeploymentHelpers:
