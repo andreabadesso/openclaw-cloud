@@ -1,6 +1,5 @@
-"use client";
-
 import { useEffect } from "react";
+import { Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
   Plug,
@@ -18,11 +17,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ] as const;
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function DashboardLayout() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -145,7 +140,9 @@ export default function DashboardLayout({
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-5xl p-8">{children}</div>
+          <div className="mx-auto max-w-5xl p-8">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

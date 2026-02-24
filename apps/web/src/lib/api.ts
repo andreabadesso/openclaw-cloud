@@ -5,7 +5,6 @@ const API_URL = "/api";
 const TOKEN_KEY = "openclaw_token";
 
 function getToken(): string | null {
-  if (typeof window === "undefined") return null;
   return localStorage.getItem(TOKEN_KEY);
 }
 

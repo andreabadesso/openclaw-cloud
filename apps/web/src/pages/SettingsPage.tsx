@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { api, type Box, type BundleListItem, type UpdateBoxRequest } from "@/lib/api";
@@ -15,7 +13,6 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Editable fields
   const [model, setModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState("");
   const [language, setLanguage] = useState("");

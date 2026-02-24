@@ -1,8 +1,6 @@
-"use client";
-
 import { useState, useCallback, useEffect } from "react";
-import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/auth";
 import { api, type BundleListItem } from "@/lib/api";
@@ -85,9 +83,9 @@ function CheckIcon({ className }: { className?: string }) {
 }
 
 export default function SetupPage() {
-  const t = useTranslations("setup");
+  const { t } = useTranslation();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { user, isLoading, isAuthenticated } = useAuth();
 
   const [step, setStep] = useState(0);
@@ -102,7 +100,6 @@ export default function SetupPage() {
   useEffect(() => {
     api.getBundles().then((b) => {
       setBundles(b);
-      // Auto-select from query param
       const bundleSlug = searchParams.get("bundle");
       if (bundleSlug) {
         const match = b.find((item) => item.slug === bundleSlug);
@@ -141,7 +138,6 @@ export default function SetupPage() {
     }
   };
 
-  // Auth guards
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -172,10 +168,10 @@ export default function SetupPage() {
           {step === 0 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
-                {t("bundle.title")}
+                {t("setup.bundle.title")}
               </h2>
               <p className="mt-2 text-[14px] text-white/40">
-                {t("bundle.subtitle")}
+                {t("setup.bundle.subtitle")}
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -250,7 +246,7 @@ export default function SetupPage() {
               {selectedBundle && selectedBundle.providers.filter(p => p.required).length > 0 && (
                 <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3">
                   <p className="text-[12px] text-amber-400/80">
-                    {t("bundle.requiredServices")}:{" "}
+                    {t("setup.bundle.requiredServices")}:{" "}
                     {selectedBundle.providers
                       .filter((p) => p.required)
                       .map((p) => p.provider)
@@ -270,7 +266,7 @@ export default function SetupPage() {
                       : "cursor-not-allowed bg-white/[0.06] text-white/30",
                   )}
                 >
-                  {t("continue")}
+                  {t("setup.continue")}
                 </button>
               </div>
             </div>
@@ -280,48 +276,46 @@ export default function SetupPage() {
           {step === 1 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
-                {t("telegram.title")}
+                {t("setup.telegram.title")}
               </h2>
               <p className="mt-2 text-[14px] text-white/40">
-                {t("telegram.subtitle")}
+                {t("setup.telegram.subtitle")}
               </p>
 
               <div className="mt-8 space-y-6">
-                {/* Bot Token */}
                 <div>
                   <label className="block text-[13px] font-medium text-white/70">
-                    {t("telegram.botTokenLabel")}
+                    {t("setup.telegram.botTokenLabel")}
                   </label>
                   <div className="mt-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
                     <ol className="mb-4 space-y-1 text-[12px] text-white/30">
-                      <li>{t("telegram.botStep1")}</li>
-                      <li>{t("telegram.botStep2")}</li>
-                      <li>{t("telegram.botStep3")}</li>
+                      <li>{t("setup.telegram.botStep1")}</li>
+                      <li>{t("setup.telegram.botStep2")}</li>
+                      <li>{t("setup.telegram.botStep3")}</li>
                     </ol>
                     <input
                       type="text"
                       value={botToken}
                       onChange={(e) => setBotToken(e.target.value)}
-                      placeholder={t("telegram.botTokenPlaceholder")}
+                      placeholder={t("setup.telegram.botTokenPlaceholder")}
                       className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[13px] text-white/90 placeholder-white/20 outline-none transition-colors focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20"
                     />
                   </div>
                 </div>
 
-                {/* User ID */}
                 <div>
                   <label className="block text-[13px] font-medium text-white/70">
-                    {t("telegram.userIdLabel")}
+                    {t("setup.telegram.userIdLabel")}
                   </label>
                   <div className="mt-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
                     <p className="mb-4 text-[12px] text-white/30">
-                      {t("telegram.userIdHint")}
+                      {t("setup.telegram.userIdHint")}
                     </p>
                     <input
                       type="text"
                       value={userId}
                       onChange={(e) => setUserId(e.target.value)}
-                      placeholder={t("telegram.userIdPlaceholder")}
+                      placeholder={t("setup.telegram.userIdPlaceholder")}
                       className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[13px] text-white/90 placeholder-white/20 outline-none transition-colors focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20"
                     />
                   </div>
@@ -333,7 +327,7 @@ export default function SetupPage() {
                   onClick={prev}
                   className="text-[13px] text-white/40 transition-colors hover:text-white/70"
                 >
-                  {t("back")}
+                  {t("setup.back")}
                 </button>
                 <button
                   onClick={next}
@@ -345,7 +339,7 @@ export default function SetupPage() {
                       : "cursor-not-allowed bg-white/[0.06] text-white/30",
                   )}
                 >
-                  {t("continue")}
+                  {t("setup.continue")}
                 </button>
               </div>
             </div>
@@ -355,10 +349,10 @@ export default function SetupPage() {
           {step === 2 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
-                {t("tier.title")}
+                {t("setup.tier.title")}
               </h2>
               <p className="mt-2 text-[14px] text-white/40">
-                {t("tier.subtitle")}
+                {t("setup.tier.subtitle")}
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -381,7 +375,7 @@ export default function SetupPage() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-[14px] font-semibold text-white/90">
-                        {t(`tier.${t_.key}.name`)}
+                        {t(`setup.tier.${t_.key}.name`)}
                       </span>
                       {t_.highlighted && (
                         <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
@@ -422,7 +416,7 @@ export default function SetupPage() {
                       <div className="mt-4 flex items-center justify-center">
                         <CheckIcon className="h-4 w-4 text-emerald-400" />
                         <span className="ml-1 text-[12px] font-medium text-emerald-400">
-                          {t("tier.selected")}
+                          {t("setup.tier.selected")}
                         </span>
                       </div>
                     )}
@@ -435,13 +429,13 @@ export default function SetupPage() {
                   onClick={prev}
                   className="text-[13px] text-white/40 transition-colors hover:text-white/70"
                 >
-                  {t("back")}
+                  {t("setup.back")}
                 </button>
                 <button
                   onClick={next}
                   className="btn-cta inline-flex items-center rounded-xl bg-emerald-500 px-6 py-2.5 text-[13px] font-semibold text-black transition-all hover:bg-emerald-400"
                 >
-                  {t("continue")}
+                  {t("setup.continue")}
                 </button>
               </div>
             </div>
@@ -451,19 +445,18 @@ export default function SetupPage() {
           {step === 3 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
-                {t("review.title")}
+                {t("setup.review.title")}
               </h2>
               <p className="mt-2 text-[14px] text-white/40">
-                {t("review.subtitle")}
+                {t("setup.review.subtitle")}
               </p>
 
               <div className="mt-8 space-y-4">
-                {/* Bundle summary */}
                 <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-[12px] text-white/30">
-                        {t("review.bundleLabel")}
+                        {t("setup.review.bundleLabel")}
                       </span>
                       <p className="mt-0.5 text-[14px] font-medium text-white/90">
                         {selectedBundle?.icon}{" "}
@@ -474,7 +467,7 @@ export default function SetupPage() {
                       onClick={() => setStep(0)}
                       className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
                     >
-                      {t("review.change")}
+                      {t("setup.review.change")}
                     </button>
                   </div>
                   {selectedBundle && selectedBundle.skills.length > 0 && (
@@ -494,32 +487,30 @@ export default function SetupPage() {
                   )}
                 </div>
 
-                {/* Telegram summary */}
                 <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                   <div>
                     <span className="text-[12px] text-white/30">
-                      {t("review.telegramLabel")}
+                      {t("setup.review.telegramLabel")}
                     </span>
                     <p className="mt-0.5 text-[14px] font-medium text-white/90">
-                      {t("review.telegramConfigured")}
+                      {t("setup.review.telegramConfigured")}
                     </p>
                   </div>
                   <button
                     onClick={() => setStep(1)}
                     className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
                   >
-                    {t("review.change")}
+                    {t("setup.review.change")}
                   </button>
                 </div>
 
-                {/* Tier summary */}
                 <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                   <div>
                     <span className="text-[12px] text-white/30">
-                      {t("review.tierLabel")}
+                      {t("setup.review.tierLabel")}
                     </span>
                     <p className="mt-0.5 text-[14px] font-medium text-white/90">
-                      {t(`tier.${tier}.name`)} — $
+                      {t(`setup.tier.${tier}.name`)} — $
                       {TIERS.find((t_) => t_.key === tier)?.price}/mo
                     </p>
                   </div>
@@ -527,7 +518,7 @@ export default function SetupPage() {
                     onClick={() => setStep(2)}
                     className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
                   >
-                    {t("review.change")}
+                    {t("setup.review.change")}
                   </button>
                 </div>
               </div>
@@ -543,7 +534,7 @@ export default function SetupPage() {
                   onClick={prev}
                   className="text-[13px] text-white/40 transition-colors hover:text-white/70"
                 >
-                  {t("back")}
+                  {t("setup.back")}
                 </button>
                 <button
                   onClick={handleSubmit}
@@ -556,10 +547,10 @@ export default function SetupPage() {
                   {submitting ? (
                     <>
                       <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
-                      {t("review.creating")}
+                      {t("setup.review.creating")}
                     </>
                   ) : (
-                    t("review.submit")
+                    t("setup.review.submit")
                   )}
                 </button>
               </div>

@@ -1,17 +1,10 @@
-"use client";
-
-import { useTranslations } from "next-intl";
-import { NicheCard } from "@/components/niche-card";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { BundleCard } from "@/components/bundle-card";
 import { PricingCard } from "@/components/pricing-card";
 import { useAuth } from "@/lib/auth";
+import { api, type BundleListItem } from "@/lib/api";
 import { Link } from "@/i18n/navigation";
-
-const NICHES = [
-  { slug: "pharmacy", icon: "💊", available: true },
-  { slug: "legal", icon: "⚖️", available: false },
-  { slug: "realestate", icon: "🏠", available: false },
-  { slug: "accounting", icon: "📊", available: false },
-] as const;
 
 const TIERS = [
   { key: "starter" as const, price: 19 },
@@ -20,20 +13,24 @@ const TIERS = [
 ];
 
 export default function HomePage() {
-  const t = useTranslations();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const [bundles, setBundles] = useState<BundleListItem[]>([]);
+  const [bundlesLoading, setBundlesLoading] = useState(true);
+
+  useEffect(() => {
+    api.getBundles().then(setBundles).catch(() => {}).finally(() => setBundlesLoading(false));
+  }, []);
 
   const ctaHref = isAuthenticated ? "/dashboard" : "/login";
   const ctaText = isAuthenticated ? t("header.dashboard") : t("hero.cta");
 
   return (
     <>
-      {/* ═══════════ HERO ═══════════ */}
+      {/* HERO */}
       <section className="relative flex flex-col items-center overflow-hidden px-6 pb-32 pt-40">
-        {/* Radial glow */}
         <div className="hero-glow" />
 
-        {/* Badge */}
         <div className="animate-fade-up relative z-10 mb-8 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-1.5">
           <span className="animate-pulse-glow h-1.5 w-1.5 rounded-full bg-emerald-400" />
           <span className="text-[12px] font-medium tracking-wide text-emerald-400/90">
@@ -41,19 +38,16 @@ export default function HomePage() {
           </span>
         </div>
 
-        {/* Heading */}
         <h1 className="animate-fade-up delay-100 relative z-10 max-w-3xl text-center text-[clamp(2.25rem,5vw,4rem)] font-bold leading-[1.08] tracking-tight text-white">
           {t("hero.title")}
           <br />
           <span className="text-gradient">{t("hero.titleAccent")}</span>
         </h1>
 
-        {/* Subtitle */}
         <p className="animate-fade-up delay-200 relative z-10 mt-6 max-w-lg text-center text-[15px] leading-relaxed text-white/45">
           {t("hero.subtitle")}
         </p>
 
-        {/* CTA */}
         <div className="animate-fade-up delay-300 relative z-10 mt-10 flex items-center gap-4">
           <Link
             href={ctaHref}
@@ -76,14 +70,12 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
       </section>
 
-      {/* ═══════════ DIVIDER ═══════════ */}
       <div className="divider-gradient mx-auto max-w-4xl" />
 
-      {/* ═══════════ NICHE CATALOG ═══════════ */}
+      {/* AGENT BUNDLES */}
       <section className="px-6 py-28">
         <div className="mx-auto max-w-5xl">
           <div className="text-center">
@@ -91,35 +83,63 @@ export default function HomePage() {
               Marketplace
             </span>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              {t("niches.sectionTitle")}
+              {t("bundles.sectionTitle")}
             </h2>
             <p className="mx-auto mt-4 max-w-md text-[15px] text-white/40">
-              {t("niches.sectionSubtitle")}
+              {t("bundles.sectionSubtitle")}
             </p>
           </div>
 
-          <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {NICHES.map((niche) => (
-              <NicheCard
-                key={niche.slug}
-                slug={niche.slug}
-                name={t(`niches.${niche.slug}.name`)}
-                tagline={t(`niches.${niche.slug}.tagline`)}
-                icon={niche.icon}
-                available={niche.available}
-                features={t.raw(`niches.${niche.slug}.features`) as string[]}
-                comingSoonLabel={t("niches.comingSoon")}
-                ctaLabel={t("niches.cta")}
-              />
-            ))}
+          <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {bundlesLoading ? (
+              <>
+                {Array.from({ length: 3 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col rounded-xl border border-white/[0.04] bg-[#111]/80 p-6 animate-pulse"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-lg bg-white/[0.06]" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-24 rounded bg-white/[0.06]" />
+                        <div className="h-3 w-36 rounded bg-white/[0.04]" />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex gap-1.5">
+                      <div className="h-5 w-14 rounded-full bg-white/[0.04]" />
+                      <div className="h-5 w-16 rounded-full bg-white/[0.04]" />
+                    </div>
+                    <div className="mt-auto pt-6">
+                      <div className="h-10 rounded-lg bg-white/[0.06]" />
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : bundles.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center py-12 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+                  <span className="text-2xl">📦</span>
+                </div>
+                <p className="mt-4 text-[15px] text-white/40">
+                  {t("bundles.empty")}
+                </p>
+              </div>
+            ) : (
+              bundles.map((bundle) => (
+                <BundleCard
+                  key={bundle.id}
+                  bundle={bundle}
+                  ctaLabel={t("bundles.cta")}
+                />
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      {/* ═══════════ DIVIDER ═══════════ */}
       <div className="divider-gradient mx-auto max-w-4xl" />
 
-      {/* ═══════════ HOW IT WORKS ═══════════ */}
+      {/* HOW IT WORKS */}
       <section className="px-6 py-28">
         <div className="mx-auto max-w-4xl">
           <div className="text-center">
@@ -137,7 +157,6 @@ export default function HomePage() {
                 key={step}
                 className={`relative flex flex-col items-center text-center px-6 ${i < 2 ? "step-connector" : ""}`}
               >
-                {/* Step number */}
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06]">
                   <span className="text-lg font-bold text-emerald-400">
                     {i + 1}
@@ -156,10 +175,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════ DIVIDER ═══════════ */}
       <div className="divider-gradient mx-auto max-w-4xl" />
 
-      {/* ═══════════ PRICING ═══════════ */}
+      {/* PRICING */}
       <section id="pricing" className="px-6 py-28">
         <div className="mx-auto max-w-5xl">
           <div className="text-center">
@@ -180,7 +198,7 @@ export default function HomePage() {
                 key={tier.key}
                 name={t(`pricing.${tier.key}.name`)}
                 price={tier.price}
-                features={t.raw(`pricing.${tier.key}.features`) as string[]}
+                features={t(`pricing.${tier.key}.features`, { returnObjects: true }) as string[]}
                 highlighted={tier.highlighted}
                 ctaLabel={t("pricing.cta")}
                 perMonthLabel={t("pricing.perMonth")}
@@ -190,9 +208,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════ FINAL CTA ═══════════ */}
+      {/* FINAL CTA */}
       <section className="relative overflow-hidden px-6 py-28">
-        {/* Background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-emerald-500/[0.04] blur-[100px] pointer-events-none" />
 
         <div className="relative mx-auto max-w-2xl text-center">
@@ -224,7 +241,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══════════ FOOTER ═══════════ */}
+      {/* FOOTER */}
       <footer className="border-t border-white/[0.04] px-6 py-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <span className="text-[12px] text-white/20">

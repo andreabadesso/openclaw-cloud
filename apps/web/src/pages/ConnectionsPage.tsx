@@ -1,8 +1,8 @@
-"use client";
-
 import { useEffect, useState, useCallback } from "react";
 import Nango from "@nangohq/frontend";
-import { api, type Connection } from "@/lib/api";
+import { api, type Connection, type Box, type BundleListItem } from "@/lib/api";
+
+const NANGO_URL = import.meta.env.VITE_NANGO_URL || "http://localhost:3003";
 
 const PROVIDERS = [
   { id: "github", name: "GitHub", description: "Repositories, issues, and pull requests" },
@@ -51,6 +51,7 @@ const PROVIDER_ICONS: Record<string, React.ReactNode> = {
 
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [requiredProviders, setRequiredProviders] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -65,6 +66,19 @@ export default function ConnectionsPage() {
 
   useEffect(() => {
     fetchConnections();
+    Promise.all([
+      api.getBox("me").catch(() => null),
+      api.getBundles().catch(() => []),
+    ]).then(([box, bundles]) => {
+      if (box?.bundle_id) {
+        const bundle = bundles.find((b: BundleListItem) => b.id === box.bundle_id);
+        if (bundle) {
+          setRequiredProviders(
+            new Set(bundle.providers.filter((p) => p.required).map((p) => p.provider))
+          );
+        }
+      }
+    });
   }, [fetchConnections]);
 
   function getConnection(providerId: string): Connection | undefined {
@@ -77,7 +91,7 @@ export default function ConnectionsPage() {
       const session = await api.authorizeConnection(providerId);
 
       const nango = new Nango({
-        host: "http://localhost:3003",
+        host: NANGO_URL,
         connectSessionToken: session.session_token,
       });
 
@@ -117,7 +131,7 @@ export default function ConnectionsPage() {
       const session = await api.reconnectConnection(connectionId);
 
       const nango = new Nango({
-        host: "http://localhost:3003",
+        host: NANGO_URL,
         connectSessionToken: session.session_token,
       });
 
@@ -206,18 +220,25 @@ export default function ConnectionsPage() {
                     </p>
                   </div>
                 </div>
-                {isConnected && (
-                  <span className="flex items-center gap-1.5 text-xs text-emerald-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-                    Connected
-                  </span>
-                )}
-                {isError && (
-                  <span className="flex items-center gap-1.5 text-xs text-red-400">
-                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
-                    Error
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {requiredProviders.has(provider.id) && (
+                    <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                      Required
+                    </span>
+                  )}
+                  {isConnected && (
+                    <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+                      <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                      Connected
+                    </span>
+                  )}
+                  {isError && (
+                    <span className="flex items-center gap-1.5 text-xs text-red-400">
+                      <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                      Error
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="mt-4">
                 {isConnected && conn && (

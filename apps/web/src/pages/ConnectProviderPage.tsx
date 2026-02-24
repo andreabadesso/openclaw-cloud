@@ -1,8 +1,5 @@
-"use client";
-
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
-import Nango from "@nangohq/frontend";
+import { useParams, useSearchParams } from "react-router-dom";
 
 type State = "validating" | "connecting" | "success" | "error";
 
@@ -20,9 +17,8 @@ function formatProvider(provider: string): string {
 }
 
 export default function ConnectProviderPage() {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const provider = params.provider as string;
+  const { provider } = useParams<{ provider: string }>();
+  const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
   const [state, setState] = useState<State>("validating");
@@ -30,6 +26,7 @@ export default function ConnectProviderPage() {
   const [customerId, setCustomerId] = useState<string | null>(null);
 
   const startConnect = useCallback(async (custId: string) => {
+    if (!provider) return;
     try {
       setState("connecting");
       const res = await fetch(`/api/me/connections/${provider}/authorize`, {
@@ -40,39 +37,50 @@ export default function ConnectProviderPage() {
         },
       });
       if (!res.ok) throw new Error("Failed to start connection");
-      const { session_token } = await res.json();
+      const { connect_url } = await res.json();
 
-      const nango = new Nango({
-        host: "http://localhost:3003",
-        connectSessionToken: session_token,
-      });
+      const popup = window.open(connect_url, "nango-connect", "width=600,height=700");
 
-      await nango.auth(provider);
-
-      // After successful OAuth, confirm the connection
-      try {
-        await fetch(`/api/me/connections/${provider}/confirm`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Customer-Id": custId },
-        });
-      } catch {
-        // Connection may not have completed — that's OK
-      }
-      setState("success");
+      const interval = setInterval(async () => {
+        if (popup?.closed) {
+          clearInterval(interval);
+          try {
+            const confirmRes = await fetch(`/api/me/connections/${provider}/confirm`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Customer-Id": custId },
+            });
+            if (confirmRes.ok) {
+              setState("success");
+            } else {
+              const checkRes = await fetch(`/api/me/connections`, {
+                headers: { "X-Customer-Id": custId },
+              });
+              const data = await checkRes.json();
+              const connected = data.connections?.some(
+                (c: { provider: string; status: string }) =>
+                  c.provider === provider && c.status === "connected",
+              );
+              if (connected) {
+                setState("success");
+              } else {
+                setState("error");
+                setError("Connection was not completed. Please try again.");
+              }
+            }
+          } catch {
+            setState("error");
+            setError("Could not verify connection status.");
+          }
+        }
+      }, 500);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Connection failed";
-      if (msg.includes("window_closed")) {
-        setState("error");
-        setError("Authorization window was closed. Please try again.");
-      } else {
-        setState("error");
-        setError(msg);
-      }
+      setState("error");
+      setError(e instanceof Error ? e.message : "Connection failed");
     }
   }, [provider]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !provider) {
       setState("error");
       setError("Missing token");
       return;
@@ -93,7 +101,7 @@ export default function ConnectProviderPage() {
       });
   }, [provider, token, startConnect]);
 
-  const displayName = formatProvider(provider);
+  const displayName = formatProvider(provider ?? "");
 
   if (state === "validating") {
     return (

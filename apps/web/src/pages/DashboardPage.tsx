@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState, useRef, useCallback } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { UsageGauge } from "@/components/usage-gauge";
@@ -48,7 +46,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const loadFullDashboard = useCallback((b: Box) => {
+  const loadFullDashboard = useCallback((_b: Box) => {
     Promise.all([
       api.getConnections().catch(() => [] as Connection[]),
       api.getAnalytics(24).catch(() => null),

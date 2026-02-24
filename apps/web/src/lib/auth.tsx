@@ -1,5 +1,3 @@
-"use client";
-
 import {
   createContext,
   useContext,
@@ -24,6 +22,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   token: string | null;
   login: (provider: "google" | "github") => void;
+  devLogin: () => void;
   logout: () => void;
 }
 
@@ -57,6 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `/api/auth/${provider}`;
   }, []);
 
+  const devLogin = useCallback(() => {
+    window.location.href = `/api/auth/dev-login`;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
@@ -71,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         token,
         login,
+        devLogin,
         logout,
       }}
     >
