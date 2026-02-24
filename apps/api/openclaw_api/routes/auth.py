@@ -234,6 +234,31 @@ async def github_callback(
     return RedirectResponse(f"{settings.web_url}/auth/callback?token={token}")
 
 
+# --- Dev login ---
+
+
+@router.get("/dev-login")
+async def dev_login(
+    db: AsyncSession = Depends(get_db),
+):
+    if not settings.dev_mode:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    customer = await _find_or_create_customer(
+        db,
+        auth_provider="dev",
+        auth_provider_id="dev",
+        email="dev@openclaw.dev",
+        name="Dev User",
+        avatar_url=None,
+    )
+    await db.commit()
+    await db.refresh(customer)
+
+    token = _create_jwt(customer.id, customer.email)
+    return RedirectResponse(f"{settings.web_url}/auth/callback?token={token}")
+
+
 # --- Me endpoint ---
 
 

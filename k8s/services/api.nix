@@ -27,6 +27,7 @@ in {
                 { name = "WEB_URL";            valueFrom.secretKeyRef = { name = "platform-secrets"; key = "web_url"; }; }
                 { name = "NANGO_PUBLIC_KEY"; valueFrom.secretKeyRef = { name = "platform-secrets"; key = "nango_public_key"; }; }
                 { name = "REDIS_OPERATOR_QUEUE"; value = "operator:jobs"; }
+                { name = "DEV_MODE";         value = "true"; }
                 { name = "PORT";             value = "8000"; }
               ];
               ports = [{ containerPort = 8000; protocol = "TCP"; }];
