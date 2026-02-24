@@ -22,39 +22,32 @@
     clusterConfig = builtins.fromJSON (builtins.readFile ./cluster.json);
   in
   {
+    # ─── NixOS configurations (used by nixos-anywhere + colmena) ─────────────
+    nixosConfigurations.server-1 = nixpkgs.lib.nixosSystem {
+      inherit system;
+      specialArgs = { inherit inputs self clusterConfig; };
+      modules = [
+        ./nodes/common.nix
+        ./nodes/server.nix
+        { networking.hostName = "openclaw-prod"; }
+      ];
+    };
+
     # ─── K8s cluster nodes (NixOS, managed by Colmena) ──────────────────────
     colmena = {
       meta = {
         nixpkgs     = pkgs;
-        specialArgs = { inherit inputs self; };
+        specialArgs = { inherit inputs self clusterConfig; };
       };
 
-      control-plane-1 = {
-        deployment.targetHost = clusterConfig.controlPlane.publicIp;
+      server-1 = {
+        deployment.targetHost = clusterConfig.server.publicIp;
         deployment.targetUser = "root";
         imports = [
           ./nodes/common.nix
-          (./nodes/control-plane.nix)
+          ./nodes/server.nix
         ];
-        deployment.tags = [ "control-plane" ];
-        networking.hostName = "control-plane-1";
-      };
-
-      # Workers — add more entries here as you scale out
-      worker-1 = {
-        deployment.targetHost = clusterConfig.workers."worker-1".publicIp;
-        deployment.targetUser = "root";
-        imports = [ ./nodes/common.nix ./nodes/worker.nix ];
-        deployment.tags = [ "worker" ];
-        networking.hostName = "worker-1";
-      };
-
-      worker-2 = {
-        deployment.targetHost = clusterConfig.workers."worker-2".publicIp;
-        deployment.targetUser = "root";
-        imports = [ ./nodes/common.nix ./nodes/worker.nix ];
-        deployment.tags = [ "worker" ];
-        networking.hostName = "worker-2";
+        networking.hostName = "openclaw-prod";
       };
     };
 

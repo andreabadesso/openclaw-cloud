@@ -5,27 +5,46 @@
     inputs.sops-nix.nixosModules.sops
   ];
 
-  # Disk layout (Hetzner cloud BIOS VMs)
-  disko.devices.disk.sda = {
+  # Disk layout (AWS t3 NVMe + SeaBIOS/legacy BIOS)
+  disko.devices.disk.main = {
     type   = "disk";
-    device = "/dev/sda";
+    device = "/dev/nvme0n1";
     content = {
       type = "gpt";
       partitions = {
-        boot = { size = "1M";   type = "EF02"; };
-        root = { size = "100%"; content = { type = "filesystem"; format = "ext4"; mountpoint = "/"; }; };
+        boot = {
+          size    = "1M";
+          type    = "EF02";  # BIOS boot partition (required for GPT + legacy BIOS)
+        };
+        root = {
+          size    = "100%";
+          content = { type = "filesystem"; format = "ext4"; mountpoint = "/"; };
+        };
       };
     };
   };
 
-  boot.loader.grub = { enable = true; device = "/dev/sda"; };
+  boot.loader.grub = {
+    enable  = true;
+    # device is set automatically by disko (via mirroredBoots)
+  };
 
-  # Networking
+  # AWS Nitro/ENA kernel modules
+  boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "ena" ];
+  boot.kernelParams = [ "console=ttyS0,115200n8" ];
+
+  # Networking — DHCP on the primary interface (AWS assigns IP via DHCP)
+  networking.useDHCP = true;
   networking.firewall = {
     enable           = true;
-    allowedTCPPorts  = [ 22 ];          # K3s opens its own ports
+    allowedTCPPorts  = [ 22 80 443 ];
     trustedInterfaces = [ "flannel.1" "cni0" ];  # K8s overlay network
   };
+
+  # SSH authorized keys
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIES1RNV5xRvmtkoIEu6aFjjD1GBlRRDDLfh73jCKc8eM"
+  ];
 
   # Nix settings
   nix.settings = {

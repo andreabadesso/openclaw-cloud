@@ -30,15 +30,36 @@ let
     # Build allowFrom JSON array from comma-separated string
     ALLOW_JSON=$(printf '%s' "$ALLOW_FROM" | jq -R 'split(",") | map(select(. != "") | tonumber)')
 
-    # Generate AGENTS.md from OPENCLAW_CONNECTIONS
+    # Generate workspace files from bundle prompts and connections
     WORKSPACE_DIR="/root/workspace"
     mkdir -p "$WORKSPACE_DIR"
 
-    # Write system prompt as CLAUDE.md if OPENCLAW_SYSTEM_PROMPT is set
+    # Write bundle prompts as workspace markdown files
+    BUNDLE_PROMPTS="''${OPENCLAW_BUNDLE_PROMPTS:-}"
+    if [ -n "$BUNDLE_PROMPTS" ]; then
+      # Map known keys to filenames, write each as a .md file
+      for key in $(printf '%s' "$BUNDLE_PROMPTS" | jq -r 'keys[]'); do
+        content=$(printf '%s' "$BUNDLE_PROMPTS" | jq -r --arg k "$key" '.[$k]')
+        case "$key" in
+          soul)    fname="CLAUDE.md" ;;
+          rules)   fname="SOUL.md" ;;
+          tools)   fname="TOOLS.md" ;;
+          identity) fname="IDENTITY.md" ;;
+          *)       fname="$key.md" ;;
+        esac
+        printf '%s\n' "$content" > "$WORKSPACE_DIR/$fname"
+      done
+    fi
+
+    # Backward compat: write OPENCLAW_SYSTEM_PROMPT as CLAUDE.md if no bundle prompts
     SYSTEM_PROMPT="''${OPENCLAW_SYSTEM_PROMPT:-}"
-    if [ -n "$SYSTEM_PROMPT" ]; then
+    if [ -z "$BUNDLE_PROMPTS" ] && [ -n "$SYSTEM_PROMPT" ]; then
       printf '%s\n' "$SYSTEM_PROMPT" > "$WORKSPACE_DIR/CLAUDE.md"
     fi
+
+    # Read bundle MCP servers for merging with connection-derived MCP servers later
+    BUNDLE_MCP_SERVERS="''${OPENCLAW_BUNDLE_MCP_SERVERS:-}"
+
     CONNECTIONS_JSON="''${OPENCLAW_CONNECTIONS:-}"
     if [ -n "$CONNECTIONS_JSON" ]; then
       AGENT_API_URL=$(printf '%s' "$CONNECTIONS_JSON" | jq -r '.api_url')
@@ -98,6 +119,11 @@ let
         fi
       done
 
+      # Merge bundle MCP servers with connection-derived MCP servers
+      if [ -n "$BUNDLE_MCP_SERVERS" ]; then
+        MCPORTER_SERVERS=$(printf '%s' "$BUNDLE_MCP_SERVERS" | jq -c ". + $MCPORTER_SERVERS")
+      fi
+
       # Write mcporter config (only if there are MCP servers)
       if [ "$MCPORTER_SERVERS" != "{}" ]; then
         mkdir -p /root/.mcporter
@@ -105,8 +131,11 @@ let
         npx mcporter@latest --version >/dev/null 2>&1 || true
       fi
 
-      # Write SOUL.md — persona and critical behavioral rules (gets special priority)
-      cat > "$WORKSPACE_DIR/SOUL.md" << 'EOSOUL'
+      # Only write default SOUL.md/TOOLS.md/IDENTITY.md if bundle didn't provide them
+      if [ -z "$BUNDLE_PROMPTS" ] || { [ ! -f "$WORKSPACE_DIR/SOUL.md" ] && [ ! -f "$WORKSPACE_DIR/CLAUDE.md" ]; }; then
+        # Write SOUL.md — persona and critical behavioral rules (gets special priority)
+        if [ ! -f "$WORKSPACE_DIR/SOUL.md" ]; then
+          cat > "$WORKSPACE_DIR/SOUL.md" << 'EOSOUL'
 You are a helpful assistant with access to external services.
 
 CRITICAL INSTRUCTION - READ CAREFULLY:
@@ -116,9 +145,12 @@ When the user asks about Google Drive, GitHub, Slack, Linear, Notion, Jira, or a
 3. Do NOT say you don't have access
 4. Instead, use the "exec" tool to run a curl command (see TOOLS.md for the exact command)
 EOSOUL
+        fi
+      fi
 
-      # Write TOOLS.md — the actual curl commands
-      cat > "$WORKSPACE_DIR/TOOLS.md" << EOTOOLS
+      # Always write TOOLS.md with connection commands (unless bundle already provides it)
+      if [ ! -f "$WORKSPACE_DIR/TOOLS.md" ]; then
+        cat > "$WORKSPACE_DIR/TOOLS.md" << EOTOOLS
 # How to access external services
 
 Use the exec tool to run these curl commands. Replace PROVIDER_NAME with: google, github, slack, linear, notion, or jira.
@@ -131,11 +163,23 @@ exec curl -s -X POST "$AGENT_API_URL/internal/agent/connect-link" -H "Authorizat
 
 Send the returned URL to the user so they can authorize the service.
 EOTOOLS
+      fi
 
-      # Write IDENTITY.md — reinforce the rule
-      cat > "$WORKSPACE_DIR/IDENTITY.md" << 'EOIDENTITY'
+      # Write IDENTITY.md only if not already provided by bundle
+      if [ ! -f "$WORKSPACE_DIR/IDENTITY.md" ]; then
+        cat > "$WORKSPACE_DIR/IDENTITY.md" << 'EOIDENTITY'
 IMPORTANT: You have access to external services (Google Drive, GitHub, etc.) through the exec tool and curl commands described in TOOLS.md. Always check TOOLS.md before saying you cannot access a service. Never use sessions_spawn or agents_list for external services.
 EOIDENTITY
+      fi
+    fi
+
+    # Install bundle skills via clawhub
+    BUNDLE_SKILLS="''${OPENCLAW_BUNDLE_SKILLS:-}"
+    if [ -n "$BUNDLE_SKILLS" ]; then
+      for slug in $(printf '%s' "$BUNDLE_SKILLS" | jq -r '.[]'); do
+        echo "Installing skill: $slug"
+        npx clawhub@latest install "$slug" --workspace "$WORKSPACE_DIR" 2>&1 || echo "Warning: failed to install skill $slug"
+      done
     fi
 
     # Browser proxy config — pass proxy token as query param to avoid

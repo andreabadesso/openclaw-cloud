@@ -1,0 +1,10 @@
+keys:
+  - &admin age17qqsp8w74x6fyrvqa82gmn3zllk2m9r0crd0dtkrdndyz7e9q5fqq7hger
+  - &server age102kua49dd20g6g5fyayl40klffrmt3jm3nawtlxs83sms3z86qpq0wg7vk
+
+creation_rules:
+  - path_regex: secrets/cluster\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *server

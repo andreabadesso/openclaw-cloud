@@ -15,9 +15,9 @@ in {
             containers.web = {
               inherit image;
               env = [
-                { name = "NEXT_PUBLIC_API_URL"; value = "https://api.openclaw.cloud"; }
-                { name = "NEXT_PUBLIC_WS_URL";  value = "wss://api.openclaw.cloud/ws"; }
+                { name = "NEXT_PUBLIC_NANGO_URL"; value = "https://nango.openclaw.trustbit.co.in"; }
                 { name = "PORT";                value = "3000"; }
+                { name = "API_URL";             value = "http://api.platform.svc.cluster.local:8000"; }
               ];
               ports = [{ containerPort = 3000; protocol = "TCP"; }];
               resources = {

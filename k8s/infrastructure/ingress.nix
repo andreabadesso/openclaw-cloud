@@ -12,12 +12,12 @@
     spec = {
       ingressClassName = "nginx";
       tls = [{
-        hosts      = [ "app.openclaw.cloud" "api.openclaw.cloud" "proxy.openclaw.cloud" ];
+        hosts      = [ "app.openclaw.trustbit.co.in" "api.openclaw.trustbit.co.in" "proxy.openclaw.trustbit.co.in" "nango.openclaw.trustbit.co.in" ];
         secretName = "openclaw-tls";
       }];
       rules = [
         {
-          host = "app.openclaw.cloud";
+          host = "app.openclaw.trustbit.co.in";
           http.paths = [{
             path     = "/";
             pathType = "Prefix";
@@ -25,7 +25,7 @@
           }];
         }
         {
-          host = "api.openclaw.cloud";
+          host = "api.openclaw.trustbit.co.in";
           http.paths = [{
             path     = "/";
             pathType = "Prefix";
@@ -33,11 +33,19 @@
           }];
         }
         {
-          host = "proxy.openclaw.cloud";
+          host = "proxy.openclaw.trustbit.co.in";
           http.paths = [{
             path     = "/";
             pathType = "Prefix";
             backend.service = { name = "token-proxy"; port.number = 8080; };
+          }];
+        }
+        {
+          host = "nango.openclaw.trustbit.co.in";
+          http.paths = [{
+            path     = "/";
+            pathType = "Prefix";
+            backend.service = { name = "nango-server"; port.number = 8080; };
           }];
         }
       ];

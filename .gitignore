@@ -3,7 +3,6 @@ cluster.json
 result
 result-*
 *.age
-secrets/
 .env
 __pycache__/
 *.pyc
