@@ -22,6 +22,7 @@ from openclaw_api.models import (
     Base,
     Box,
     BoxStatus,
+    Bundle,
     Customer,
     CustomerConnection,
     OperatorJob,
@@ -96,6 +97,7 @@ sqlite3.register_adapter(dict, lambda val: json.dumps(val))
 TEST_CUSTOMER_ID = "00000000-0000-0000-0000-000000000001"
 TEST_BOX_ID = "00000000-0000-0000-0000-000000000010"
 TEST_SUB_ID = "00000000-0000-0000-0000-000000000020"
+TEST_BUNDLE_ID = "00000000-0000-0000-0000-000000000030"
 
 engine = create_async_engine(
     "sqlite+aiosqlite://",
@@ -221,6 +223,30 @@ async def seed_usage(db: AsyncSession, seed_customer):
     db.add(usage)
     await db.commit()
     return usage
+
+
+@pytest_asyncio.fixture
+async def seed_bundle(db: AsyncSession):
+    bundle = Bundle(
+        id=TEST_BUNDLE_ID,
+        slug="general-assistant",
+        name="General Assistant",
+        description="A versatile AI assistant",
+        icon="🤖",
+        color="#10B981",
+        status="published",
+        prompts={"system": "You are a helpful assistant."},
+        default_model="kimi-coding/k2p5",
+        default_thinking_level="medium",
+        default_language="en",
+        providers=[{"provider": "github", "required": False}],
+        mcp_servers={},
+        skills=["web-search"],
+        sort_order=0,
+    )
+    db.add(bundle)
+    await db.commit()
+    return bundle
 
 
 @pytest_asyncio.fixture

@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api";
+import { api, type BundleListItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-const NICHES = [
-  { slug: "general", icon: "🤖", available: true },
-  { slug: "pharmacy", icon: "💊", available: true },
-  { slug: "legal", icon: "⚖️", available: false },
-  { slug: "realestate", icon: "🏠", available: false },
-  { slug: "accounting", icon: "📊", available: false },
-];
 
 const TIERS = [
   {
@@ -51,7 +44,7 @@ const TIERS = [
   },
 ];
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 function StepDots({ current }: { current: number }) {
   return (
@@ -94,22 +87,44 @@ function CheckIcon({ className }: { className?: string }) {
 export default function SetupPage() {
   const t = useTranslations("setup");
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading, isAuthenticated } = useAuth();
 
   const [step, setStep] = useState(0);
-  const [niche, setNiche] = useState("general");
+  const [bundles, setBundles] = useState<BundleListItem[]>([]);
+  const [selectedBundleId, setSelectedBundleId] = useState<string | null>(null);
   const [botToken, setBotToken] = useState("");
   const [userId, setUserId] = useState("");
   const [tier, setTier] = useState("pro");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    api.getBundles().then((b) => {
+      setBundles(b);
+      // Auto-select from query param
+      const bundleSlug = searchParams.get("bundle");
+      if (bundleSlug) {
+        const match = b.find((item) => item.slug === bundleSlug);
+        if (match) {
+          setSelectedBundleId(match.id);
+          return;
+        }
+      }
+      if (b.length > 0 && !selectedBundleId) {
+        setSelectedBundleId(b[0].id);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const selectedBundle = bundles.find((b) => b.id === selectedBundleId);
   const canContinueTelegram = botToken.trim().length > 0 && userId.trim().length > 0;
 
   const next = useCallback(() => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1)), []);
   const prev = useCallback(() => setStep((s) => Math.max(s - 1, 0)), []);
 
   const handleSubmit = async () => {
+    if (!selectedBundleId) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -117,15 +132,11 @@ export default function SetupPage() {
         telegram_bot_token: botToken.trim(),
         telegram_user_id: Number(userId.trim()),
         tier,
-        niche: niche === "general" ? undefined : niche,
-        model: "claude-sonnet-4-20250514",
-        thinking_level: tier === "team" ? "high" : "medium",
-        language: "en",
+        bundle_id: selectedBundleId,
       });
       router.push("/dashboard");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -157,102 +168,107 @@ export default function SetupPage() {
         </div>
 
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 sm:p-10">
-          {/* Step 0: Welcome */}
+          {/* Step 0: Choose Agent Bundle */}
           {step === 0 && (
-            <div className="animate-fade-up text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10">
-                <span className="text-3xl">🚀</span>
-              </div>
-              <h1 className="mt-6 text-2xl font-bold text-white sm:text-3xl">
-                {t("welcome.title")}
-              </h1>
-              <p className="mt-3 text-[15px] text-white/45">
-                {t("welcome.subtitle")}
-              </p>
-              <button
-                onClick={next}
-                className="btn-cta mt-10 inline-flex items-center rounded-xl bg-emerald-500 px-8 py-3 text-[14px] font-semibold text-black transition-all hover:bg-emerald-400 hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.4)]"
-              >
-                {t("welcome.cta")}
-                <svg
-                  className="ml-2 h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </button>
-            </div>
-          )}
-
-          {/* Step 1: Choose Niche */}
-          {step === 1 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
-                {t("niche.title")}
+                {t("bundle.title")}
               </h2>
               <p className="mt-2 text-[14px] text-white/40">
-                {t("niche.subtitle")}
+                {t("bundle.subtitle")}
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {NICHES.map((n) => (
-                  <button
-                    key={n.slug}
-                    disabled={!n.available}
-                    onClick={() => n.available && setNiche(n.slug)}
-                    className={cn(
-                      "relative flex items-center gap-4 rounded-xl border p-4 text-left transition-all duration-200",
-                      n.available
-                        ? niche === n.slug
-                          ? "border-emerald-500/50 bg-emerald-500/[0.06] shadow-[0_0_20px_-5px_rgba(16,185,129,0.15)]"
-                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]"
-                        : "cursor-not-allowed border-white/[0.04] bg-white/[0.01] opacity-50",
-                    )}
-                  >
-                    <div
+                {bundles.map((b) => {
+                  const requiredProviders = b.providers.filter((p) => p.required);
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => setSelectedBundleId(b.id)}
                       className={cn(
-                        "flex h-10 w-10 items-center justify-center rounded-lg text-xl",
-                        n.available && niche === n.slug
-                          ? "bg-emerald-500/10"
-                          : "bg-white/[0.03]",
+                        "relative flex flex-col gap-3 rounded-xl border p-4 text-left transition-all duration-200",
+                        selectedBundleId === b.id
+                          ? "border-emerald-500/50 bg-emerald-500/[0.06] shadow-[0_0_20px_-5px_rgba(16,185,129,0.15)]"
+                          : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]",
                       )}
                     >
-                      {n.icon}
-                    </div>
-                    <div className="flex-1">
-                      <span className="text-[14px] font-medium text-white/90">
-                        {t(`niche.${n.slug}`)}
-                      </span>
-                    </div>
-                    {n.available && niche === n.slug && (
-                      <CheckIcon className="h-4 w-4 text-emerald-400" />
-                    )}
-                    {!n.available && (
-                      <span className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/30">
-                        {t("niche.comingSoon")}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={cn(
+                            "flex h-10 w-10 items-center justify-center rounded-lg text-xl",
+                            selectedBundleId === b.id
+                              ? "bg-emerald-500/10"
+                              : "bg-white/[0.03]",
+                          )}
+                        >
+                          {b.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[14px] font-medium text-white/90">
+                            {b.name}
+                          </span>
+                          {b.description && (
+                            <p className="mt-0.5 text-[12px] text-white/35 truncate">
+                              {b.description}
+                            </p>
+                          )}
+                        </div>
+                        {selectedBundleId === b.id && (
+                          <CheckIcon className="h-4 w-4 shrink-0 text-emerald-400" />
+                        )}
+                      </div>
+
+                      {(requiredProviders.length > 0 || b.skills.length > 0) && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {requiredProviders.map((p) => (
+                            <span
+                              key={p.provider}
+                              className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] capitalize text-white/50"
+                            >
+                              {p.provider}
+                            </span>
+                          ))}
+                          {b.skills.map((slug) => (
+                            <a
+                              key={slug}
+                              href={`https://clawhub.ai/skills/${slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                            >
+                              {slug}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="mt-8 flex items-center justify-between">
-                <button
-                  onClick={prev}
-                  className="text-[13px] text-white/40 transition-colors hover:text-white/70"
-                >
-                  {t("back")}
-                </button>
+              {selectedBundle && selectedBundle.providers.filter(p => p.required).length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3">
+                  <p className="text-[12px] text-amber-400/80">
+                    {t("bundle.requiredServices")}:{" "}
+                    {selectedBundle.providers
+                      .filter((p) => p.required)
+                      .map((p) => p.provider)
+                      .join(", ")}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-8 flex items-center justify-end">
                 <button
                   onClick={next}
-                  className="btn-cta inline-flex items-center rounded-xl bg-emerald-500 px-6 py-2.5 text-[13px] font-semibold text-black transition-all hover:bg-emerald-400"
+                  disabled={!selectedBundleId}
+                  className={cn(
+                    "btn-cta inline-flex items-center rounded-xl px-6 py-2.5 text-[13px] font-semibold transition-all",
+                    selectedBundleId
+                      ? "bg-emerald-500 text-black hover:bg-emerald-400"
+                      : "cursor-not-allowed bg-white/[0.06] text-white/30",
+                  )}
                 >
                   {t("continue")}
                 </button>
@@ -260,8 +276,8 @@ export default function SetupPage() {
             </div>
           )}
 
-          {/* Step 2: Telegram Setup */}
-          {step === 2 && (
+          {/* Step 1: Telegram Setup */}
+          {step === 1 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
                 {t("telegram.title")}
@@ -335,8 +351,8 @@ export default function SetupPage() {
             </div>
           )}
 
-          {/* Step 3: Choose Tier */}
-          {step === 3 && (
+          {/* Step 2: Choose Tier */}
+          {step === 2 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
                 {t("tier.title")}
@@ -431,8 +447,8 @@ export default function SetupPage() {
             </div>
           )}
 
-          {/* Step 4: Review & Submit */}
-          {step === 4 && (
+          {/* Step 3: Review & Submit */}
+          {step === 3 && (
             <div className="animate-fade-up">
               <h2 className="text-xl font-bold text-white">
                 {t("review.title")}
@@ -442,23 +458,40 @@ export default function SetupPage() {
               </p>
 
               <div className="mt-8 space-y-4">
-                {/* Niche summary */}
-                <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-                  <div>
-                    <span className="text-[12px] text-white/30">
-                      {t("review.nicheLabel")}
-                    </span>
-                    <p className="mt-0.5 text-[14px] font-medium text-white/90">
-                      {NICHES.find((n) => n.slug === niche)?.icon}{" "}
-                      {t(`niche.${niche}`)}
-                    </p>
+                {/* Bundle summary */}
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[12px] text-white/30">
+                        {t("review.bundleLabel")}
+                      </span>
+                      <p className="mt-0.5 text-[14px] font-medium text-white/90">
+                        {selectedBundle?.icon}{" "}
+                        {selectedBundle?.name}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setStep(0)}
+                      className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
+                    >
+                      {t("review.change")}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setStep(1)}
-                    className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
-                  >
-                    {t("review.change")}
-                  </button>
+                  {selectedBundle && selectedBundle.skills.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {selectedBundle.skills.map((slug) => (
+                        <a
+                          key={slug}
+                          href={`https://clawhub.ai/skills/${slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                        >
+                          {slug}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Telegram summary */}
@@ -472,7 +505,7 @@ export default function SetupPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setStep(2)}
+                    onClick={() => setStep(1)}
                     className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
                   >
                     {t("review.change")}
@@ -491,7 +524,7 @@ export default function SetupPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(2)}
                     className="text-[12px] text-emerald-400/70 hover:text-emerald-400"
                   >
                     {t("review.change")}

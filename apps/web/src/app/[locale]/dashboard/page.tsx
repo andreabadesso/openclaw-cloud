@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { UsageGauge } from "@/components/usage-gauge";
-import { api, type Box, type Connection, type AnalyticsData } from "@/lib/api";
+import { api, type Box, type Connection, type AnalyticsData, type BundleListItem } from "@/lib/api";
 import { Link } from "@/i18n/navigation";
 import {
   Globe,
@@ -12,7 +12,9 @@ import {
   Cpu,
   Brain,
   Languages,
-  Target,
+  Package,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 
 function timeAgo(dateStr: string | null): string {
@@ -41,23 +43,66 @@ export default function DashboardPage() {
   const [box, setBox] = useState<Box | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [bundles, setBundles] = useState<BundleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadFullDashboard = useCallback((b: Box) => {
+    Promise.all([
+      api.getConnections().catch(() => [] as Connection[]),
+      api.getAnalytics(24).catch(() => null),
+    ]).then(([c, a]) => {
+      setConnections(c);
+      setAnalytics(a);
+    });
+  }, []);
 
   useEffect(() => {
     Promise.all([
       api.getBox("me"),
       api.getConnections().catch(() => [] as Connection[]),
       api.getAnalytics(24).catch(() => null),
+      api.getBundles().catch(() => [] as BundleListItem[]),
     ])
-      .then(([b, c, a]) => {
+      .then(([b, c, a, bndls]) => {
         setBox(b);
         setConnections(c);
         setAnalytics(a);
+        setBundles(bndls);
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  // Poll while provisioning
+  useEffect(() => {
+    if (!box) return;
+    const isProvisioning = box.status === "pending" || box.status === "provisioning";
+    if (isProvisioning && !pollRef.current) {
+      pollRef.current = setInterval(async () => {
+        try {
+          const updated = await api.getBox("me");
+          setBox(updated);
+          if (updated.status !== "pending" && updated.status !== "provisioning") {
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
+            loadFullDashboard(updated);
+          }
+        } catch { /* ignore polling errors */ }
+      }, 4000);
+    }
+    if (!isProvisioning && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [box, loadFullDashboard]);
 
   if (loading) {
     return (
@@ -79,6 +124,63 @@ export default function DashboardPage() {
         <p className="mt-1 text-sm text-white/50">
           {error ?? "No active instance found."}
         </p>
+      </div>
+    );
+  }
+
+  // Provisioning state
+  if (box.status === "pending" || box.status === "provisioning") {
+    const bundle = bundles.find((b) => b.id === box.bundle_id);
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="animate-fade-up text-center">
+          <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+            <Loader2 className="absolute h-20 w-20 animate-spin text-emerald-500/30" />
+            <span className="text-3xl">{bundle?.icon ?? "🤖"}</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white/90">
+            Setting up your agent...
+          </h1>
+          {bundle && (
+            <p className="mt-2 text-sm text-white/50">
+              Configuring <span className="text-emerald-400">{bundle.name}</span> bundle
+            </p>
+          )}
+          <p className="mt-4 text-sm text-white/30">
+            This usually takes about a minute
+          </p>
+          <div className="mt-6 flex justify-center gap-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"
+                style={{ animationDelay: `${i * 300}ms` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Suspended / unhealthy warnings
+  if (box.status === "suspended" || box.status === "unhealthy") {
+    const isSuspended = box.status === "suspended";
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="animate-fade-up max-w-md text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
+            <AlertTriangle className={`h-7 w-7 ${isSuspended ? "text-amber-400" : "text-red-400"}`} />
+          </div>
+          <h1 className="text-xl font-bold text-white/90">
+            {isSuspended ? "Agent Suspended" : "Agent Unhealthy"}
+          </h1>
+          <p className="mt-2 text-sm text-white/50">
+            {isSuspended
+              ? "Your agent has been suspended. Please contact support to reactivate."
+              : "Your agent is experiencing issues. We're looking into it."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -196,15 +298,18 @@ export default function DashboardPage() {
                 {box.language}
               </span>
             </div>
-            {box.niche && (
-              <div className="flex items-center gap-3 text-sm">
-                <Target className="h-4 w-4 text-white/30" />
-                <span className="text-white/40">Niche</span>
-                <span className="ml-auto font-medium text-white/80">
-                  {box.niche}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const bundle = bundles.find((b) => b.id === box.bundle_id);
+              return bundle ? (
+                <div className="flex items-center gap-3 text-sm">
+                  <Package className="h-4 w-4 text-white/30" />
+                  <span className="text-white/40">Bundle</span>
+                  <span className="ml-auto font-medium text-white/80">
+                    {bundle.icon} {bundle.name}
+                  </span>
+                </div>
+              ) : null;
+            })()}
           </div>
         </div>
       </div>

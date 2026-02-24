@@ -54,6 +54,7 @@ export interface Box {
   language: string;
   tier: string;
   niche: string | null;
+  bundle_id: string | null;
   tokens_used: number;
   tokens_limit: number;
   telegram_user_ids: number[];
@@ -61,15 +62,52 @@ export interface Box {
   activated_at: string | null;
 }
 
+export interface BundleProvider {
+  provider: string;
+  required: boolean;
+}
+
+export interface Bundle {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  status: string;
+  prompts: Record<string, string>;
+  default_model: string;
+  default_thinking_level: string;
+  default_language: string;
+  providers: BundleProvider[];
+  mcp_servers: Record<string, unknown>;
+  skills: string[];
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BundleListItem {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  providers: BundleProvider[];
+  skills: string[];
+  sort_order: number;
+}
+
 export interface ProvisionRequest {
   customer_email: string;
   telegram_bot_token: string;
   telegram_user_id: number;
   tier: "starter" | "pro" | "team";
-  model: string;
-  thinking_level: string;
-  language: string;
-  niche?: string;
+  bundle_id: string;
+  model?: string;
+  thinking_level?: string;
+  language?: string;
 }
 
 export interface Connection {
@@ -115,6 +153,34 @@ export interface UpdateBoxRequest {
 
 export const api = {
   getMe: (): Promise<User> => request<User>("/auth/me"),
+
+  // Bundles
+  getBundles: async (): Promise<BundleListItem[]> => {
+    const data = await request<{ bundles: BundleListItem[] }>("/bundles");
+    return data.bundles;
+  },
+
+  getBundle: (slug: string): Promise<Bundle> =>
+    request<Bundle>(`/bundles/${slug}`),
+
+  // Admin bundle CRUD
+  getAdminBundles: (): Promise<Bundle[]> =>
+    request<Bundle[]>("/internal/bundles"),
+
+  createBundle: (data: Omit<Bundle, "id" | "created_at" | "updated_at">) =>
+    request<Bundle>("/internal/bundles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateBundle: (id: string, data: Partial<Bundle>) =>
+    request<Bundle>(`/internal/bundles/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  archiveBundle: (id: string) =>
+    request(`/internal/bundles/${id}`, { method: "DELETE" }),
 
   setup: (data: Record<string, unknown>) =>
     request("/me/setup", {

@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    String,
     Text,
     UniqueConstraint,
 )
@@ -83,6 +84,28 @@ class JobStatus(str, enum.Enum):
 # --- Models ---
 
 
+class Bundle(Base):
+    __tablename__ = "bundles"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, server_default=func.gen_random_uuid())
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    icon: Mapped[str] = mapped_column(Text, nullable=False, server_default="🤖")
+    color: Mapped[str] = mapped_column(Text, nullable=False, server_default="#10B981")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    prompts: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="'{}'")
+    default_model: Mapped[str] = mapped_column(Text, nullable=False, server_default="kimi-coding/k2p5")
+    default_thinking_level: Mapped[str] = mapped_column(Text, nullable=False, server_default="medium")
+    default_language: Mapped[str] = mapped_column(Text, nullable=False, server_default="en")
+    providers: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="'[]'")
+    mcp_servers: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="'{}'")
+    skills: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="'[]'")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class Customer(Base):
     __tablename__ = "customers"
 
@@ -144,6 +167,7 @@ class Box(Base):
         server_default="pending",
     )
     niche: Mapped[str | None] = mapped_column(Text)
+    bundle_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), ForeignKey("bundles.id"))
     health_failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

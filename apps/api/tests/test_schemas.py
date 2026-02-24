@@ -16,8 +16,10 @@ def test_provision_request_valid():
         telegram_user_id=123,
         tier="starter",
         customer_email="a@b.com",
+        bundle_id="00000000-0000-0000-0000-000000000030",
     )
     assert req.tier == "starter"
+    assert req.bundle_id == "00000000-0000-0000-0000-000000000030"
 
 
 def test_provision_request_invalid_tier():
@@ -26,6 +28,17 @@ def test_provision_request_invalid_tier():
             telegram_bot_token="tok",
             telegram_user_id=123,
             tier="enterprise",
+            customer_email="a@b.com",
+            bundle_id="00000000-0000-0000-0000-000000000030",
+        )
+
+
+def test_provision_request_missing_bundle_id():
+    with pytest.raises(ValidationError):
+        ProvisionRequest(
+            telegram_bot_token="tok",
+            telegram_user_id=123,
+            tier="starter",
             customer_email="a@b.com",
         )
 
@@ -36,10 +49,11 @@ def test_provision_request_defaults():
         telegram_user_id=123,
         tier="pro",
         customer_email="a@b.com",
+        bundle_id="00000000-0000-0000-0000-000000000030",
     )
-    assert req.model == "kimi-coding/k2p5"
-    assert req.thinking_level == "medium"
-    assert req.language == "en"
+    assert req.model is None
+    assert req.thinking_level is None
+    assert req.language is None
 
 
 def test_update_box_request_all_none():
