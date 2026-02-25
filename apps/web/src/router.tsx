@@ -21,6 +21,9 @@ export function AppRoutes() {
         {/* Redirect bare / to default locale */}
         <Route index element={<Navigate to="/pt" replace />} />
 
+        {/* Auth callback without locale prefix (used by API redirects) */}
+        <Route path="auth/callback" element={<AuthCallbackPage />} />
+
         <Route path=":locale" element={<LocaleLayout />}>
           <Route index element={<HomePage />} />
           <Route path="login" element={<LoginPage />} />
