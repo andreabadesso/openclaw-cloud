@@ -23,7 +23,7 @@
               };
               ports = [{ containerPort = 6379; protocol = "TCP"; }];
               resources = {
-                requests = { cpu = "100m"; memory = "128Mi"; };
+                requests = { cpu = "25m"; memory = "128Mi"; };
                 limits   = { cpu = "500m"; memory = "768Mi"; };
               };
               volumeMounts = [{ name = "data"; mountPath = "/data"; }];

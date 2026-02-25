@@ -28,7 +28,7 @@
               ];
               ports = [{ containerPort = 5432; protocol = "TCP"; }];
               resources = {
-                requests = { cpu = "200m"; memory = "256Mi"; };
+                requests = { cpu = "50m"; memory = "256Mi"; };
                 limits   = { cpu = "1000m"; memory = "1Gi"; };
               };
               readinessProbe = {

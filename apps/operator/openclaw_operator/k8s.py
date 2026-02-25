@@ -79,19 +79,26 @@ def namespace_name(customer_id: str) -> str:
 
 
 def create_namespace(customer_id: str, tier: str) -> None:
+    from kubernetes.client.exceptions import ApiException
     ns = namespace_name(customer_id)
-    core_v1().create_namespace(
-        V1Namespace(
-            metadata=V1ObjectMeta(
-                name=ns,
-                labels={
-                    "openclaw/customer": customer_id,
-                    "openclaw/tier": tier,
-                },
+    try:
+        core_v1().create_namespace(
+            V1Namespace(
+                metadata=V1ObjectMeta(
+                    name=ns,
+                    labels={
+                        "openclaw/customer": customer_id,
+                        "openclaw/tier": tier,
+                    },
+                )
             )
         )
-    )
-    logger.info("Created namespace %s", ns)
+        logger.info("Created namespace %s", ns)
+    except ApiException as e:
+        if e.status == 409:
+            logger.info("Namespace %s already exists, skipping", ns)
+        else:
+            raise
 
 
 def delete_namespace(customer_id: str) -> None:
@@ -136,14 +143,22 @@ def create_config_secret(
     }
     if system_prompt:
         data["OPENCLAW_SYSTEM_PROMPT"] = system_prompt
-    core_v1().create_namespaced_secret(
-        namespace=ns,
-        body=V1Secret(
-            metadata=V1ObjectMeta(name="openclaw-config"),
-            string_data=data,
-        ),
-    )
-    logger.info("Created secret openclaw-config in %s", ns)
+    from kubernetes.client.exceptions import ApiException
+    try:
+        core_v1().create_namespaced_secret(
+            namespace=ns,
+            body=V1Secret(
+                metadata=V1ObjectMeta(name="openclaw-config"),
+                string_data=data,
+            ),
+        )
+        logger.info("Created secret openclaw-config in %s", ns)
+    except ApiException as e:
+        if e.status == 409:
+            patch_config_secret(customer_id, data)
+            logger.info("Patched existing secret openclaw-config in %s", ns)
+        else:
+            raise
 
 
 def patch_config_secret(customer_id: str, data: dict[str, str]) -> None:
@@ -161,15 +176,22 @@ def patch_config_secret(customer_id: str, data: dict[str, str]) -> None:
 # ---------------------------------------------------------------------------
 
 def create_resource_quota(customer_id: str, tier: str) -> None:
+    from kubernetes.client.exceptions import ApiException
     ns = namespace_name(customer_id)
-    core_v1().create_namespaced_resource_quota(
-        namespace=ns,
-        body=V1ResourceQuota(
-            metadata=V1ObjectMeta(name="tier-limits"),
-            spec=V1ResourceQuotaSpec(hard=get_quota_hard(tier)),
-        ),
-    )
-    logger.info("Created resource quota tier-limits (%s) in %s", tier, ns)
+    try:
+        core_v1().create_namespaced_resource_quota(
+            namespace=ns,
+            body=V1ResourceQuota(
+                metadata=V1ObjectMeta(name="tier-limits"),
+                spec=V1ResourceQuotaSpec(hard=get_quota_hard(tier)),
+            ),
+        )
+        logger.info("Created resource quota tier-limits (%s) in %s", tier, ns)
+    except ApiException as e:
+        if e.status == 409:
+            logger.info("Resource quota already exists in %s, skipping", ns)
+        else:
+            raise
 
 
 def patch_resource_quota(customer_id: str, tier: str) -> None:
@@ -189,7 +211,18 @@ def patch_resource_quota(customer_id: str, tier: str) -> None:
 # ---------------------------------------------------------------------------
 
 def create_network_policy(customer_id: str) -> None:
+    from kubernetes.client.exceptions import ApiException
     ns = namespace_name(customer_id)
+    try:
+        _do_create_network_policy(customer_id, ns)
+    except ApiException as e:
+        if e.status == 409:
+            logger.info("Network policy already exists in %s, skipping", ns)
+        else:
+            raise
+
+
+def _do_create_network_policy(customer_id: str, ns: str) -> None:
     networking_v1().create_namespaced_network_policy(
         namespace=ns,
         body=V1NetworkPolicy(
@@ -322,12 +355,19 @@ def _build_deployment(customer_id: str, tier: str, image: str) -> V1Deployment:
 
 
 def create_deployment(customer_id: str, tier: str, image: str) -> None:
+    from kubernetes.client.exceptions import ApiException
     ns = namespace_name(customer_id)
-    apps_v1().create_namespaced_deployment(
-        namespace=ns,
-        body=_build_deployment(customer_id, tier, image),
-    )
-    logger.info("Created deployment openclaw-gateway in %s", ns)
+    try:
+        apps_v1().create_namespaced_deployment(
+            namespace=ns,
+            body=_build_deployment(customer_id, tier, image),
+        )
+        logger.info("Created deployment openclaw-gateway in %s", ns)
+    except ApiException as e:
+        if e.status == 409:
+            logger.info("Deployment already exists in %s, skipping", ns)
+        else:
+            raise
 
 
 def patch_deployment_resources(customer_id: str, tier: str) -> None:

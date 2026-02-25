@@ -29,7 +29,7 @@ in {
               env = commonEnv;
               ports = [{ containerPort = 9223; protocol = "TCP"; }];
               resources = {
-                requests = { cpu = "100m"; memory = "64Mi"; };
+                requests = { cpu = "25m"; memory = "32Mi"; };
                 limits   = { cpu = "500m"; memory = "128Mi"; };
               };
               livenessProbe.httpGet  = { path = "/health"; port = 9223; };
